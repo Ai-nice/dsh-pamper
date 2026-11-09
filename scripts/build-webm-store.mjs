@@ -45,7 +45,8 @@ for (const character of catalog.characters) {
     jobs.push(action);
   }
 }
-const limited = LIMIT > 0 ? jobs.slice(0, LIMIT) : jobs;
+const allJobs = jobs.slice();
+const limited = LIMIT > 0 ? jobs.slice(0, LIMIT) : jobs.slice();
 console.log(`[webm-store] 任务 ${limited.length}/${jobs.length}，并发 ${JOBS}，输出 ${OUT_DIR}`);
 
 const distCache = new Map();
@@ -144,8 +145,8 @@ async function worker() {
 await Promise.all(Array.from({ length: JOBS }, () => worker()));
 
 // 写一个简单的发布清单
-const manifest = { generatedAt: new Date().toISOString(), total: jobs.length, actions: [] };
-for (const action of jobs) {
+const manifest = { generatedAt: new Date().toISOString(), total: allJobs.length, actions: [] };
+for (const action of allJobs) {
   const path = join(OUT_DIR, action.webm);
   try {
     const info = await stat(path);
