@@ -1,0 +1,21 @@
+{
+  "name": "desktop-pet",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "基于 DSH-pet 插件与 aboutme-pets 素材的多形象桌面宠物工程：把 aboutme-pets 商店的角色动画转成 DSH-pet pet pack，多个不同形象可同时出现在屏幕上。",
+  "keywords": ["dsh-pet", "deepseek-harness", "desktop-pet", "pet-pack", "aboutme-pets"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "fetch": "node scripts/fetch-catalog.mjs",
+    "build": "node scripts/build.mjs",
+    "build:all": "node scripts/build.mjs --all",
+    "install:packs": "node scripts/install.mjs",
+    "uninstall:packs": "node scripts/uninstall.mjs",
+    "patch:dsh-pet": "node scripts/patch-dsh-pet.mjs",
+    "preview": "node scripts/serve.mjs"
+  }
+}

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pamper · 全部形象预览</title>
+<style>
+  :root{
+    --bg:#eef4ff; --card:rgba(255,255,255,.82); --line:rgba(15,35,80,.12);
+    --text:#16233d; --muted:#5b6b8a; --accent:#4d7cff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#101726; --card:rgba(28,38,58,.86); --line:rgba(180,205,255,.16); --text:#e8eefc; --muted:#9fb0cf; --accent:#7ea0ff; }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{
+    font-family:system-ui,"Microsoft YaHei","PingFang SC",sans-serif; color:var(--text);
+    background:
+      radial-gradient(1200px 500px at 15% -10%, rgba(120,160,255,.35), transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, rgba(255,170,220,.28), transparent 60%),
+      var(--bg);
+    padding:26px clamp(16px,4vw,48px) 48px;
+  }
+  header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px;margin-bottom:22px}
+  h1{font-size:22px;margin:0;letter-spacing:.5px}
+  .sub{color:var(--muted);font-size:13px;line-height:1.7}
+  .sub a{color:var(--accent);text-decoration:none}
+  .badge{margin-left:auto;font-size:12px;color:var(--muted);border:1px solid var(--line);padding:6px 12px;border-radius:999px;background:var(--card)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+  .card{
+    position:relative;background:var(--card);border:1px solid var(--line);border-radius:20px;
+    padding:14px 14px 12px;backdrop-filter:blur(12px);box-shadow:0 12px 32px rgba(20,40,90,.08);
+    display:flex;flex-direction:column;gap:8px;transition:transform .18s ease,box-shadow .18s ease;
+  }
+  .card:hover{transform:translateY(-3px);box-shadow:0 18px 42px rgba(20,40,90,.14)}
+  .stage{
+    position:relative;border-radius:16px;overflow:hidden;aspect-ratio:16/10;
+    background:
+      radial-gradient(120% 90% at 50% 100%, rgba(130,170,255,.30), transparent 60%),
+      linear-gradient(180deg, rgba(190,215,255,.5), rgba(255,255,255,.15));
+  }
+  @media (prefers-color-scheme: dark){
+    .stage{background:radial-gradient(120% 90% at 50% 100%, rgba(90,120,220,.35), transparent 60%), linear-gradient(180deg, rgba(40,60,110,.5), rgba(20,28,48,.2))}
+  }
+  .stage video{position:absolute;left:50%;bottom:6%;width:min(88%,380px);transform:translateX(-50%);filter:drop-shadow(0 10px 12px rgba(20,40,80,.25))}
+  .avatar{width:38px;height:38px;border-radius:12px;object-fit:cover;border:1px solid var(--line);background:#fff2}
+  .row{display:flex;align-items:center;gap:10px}
+  .name{font-weight:700;font-size:15px}
+  .kind{font-size:11px;color:var(--muted);font-family:ui-monospace,Consolas,monospace}
+  .meta{display:flex;flex-wrap:wrap;gap:6px;font-size:11px;color:var(--muted)}
+  .meta span{border:1px solid var(--line);border-radius:999px;padding:3px 8px}
+  .actions{display:flex;gap:8px;margin-top:auto}
+  .actions button{
+    flex:1;cursor:pointer;border:1px solid var(--line);border-radius:10px;padding:7px 8px;
+    background:linear-gradient(180deg,rgba(255,255,255,.7),rgba(240,245,255,.5));color:var(--text);font-size:12px;
+  }
+  @media (prefers-color-scheme: dark){ .actions button{background:linear-gradient(180deg,rgba(60,80,120,.6),rgba(30,42,66,.6))} }
+  .actions button:hover{border-color:var(--accent);color:var(--accent)}
+  .err{margin-top:14px;padding:14px 18px;border-radius:14px;border:1px solid #e8b4b4;background:#fff3f3;color:#8c2f2f;font-size:13px;display:none;white-space:pre-wrap}
+  footer{margin-top:22px;color:var(--muted);font-size:12px;line-height:1.8}
+  code{font-family:ui-monospace,Consolas,monospace;background:rgba(120,150,220,.16);padding:1px 6px;border-radius:6px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>全部形象预览 · 8 个新桌宠</h1>
+    <div class="sub">本地 WebM 直接播放（透明 VP9），来自 aboutme-pets 与「小小桌宠」两个素材项目。加 dsh-pet 内置蓝毛小女仆共 9 个形象。</div>
+  </div>
+  <div class="badge" id="badge">加载中…</div>
+</header>
+
+<main>
+  <div class="grid" id="grid"></div>
+  <div class="err" id="err"></div>
+</main>
+
+<footer>
+  打开方式：在项目根目录执行 <code>node scripts/serve.mjs</code>，访问 <code>http://127.0.0.1:8899/preview/all-characters.html</code>。
+  点击「换动作」切换该形象的动作；「回到待机」恢复默认。透明视频在深色/浅色背景下都能正常显示。
+</footer>
+
+<script type="module">
+const AVATARS = {
+  'aboutme-dragon': '../catalog/pets/gpt/avatar.webp',
+  'aboutme-claude': '../catalog/pets/claude/avatar.webp',
+  'aboutme-gemini': '../catalog/pets/gemini/avatar.webp'
+};
+const grid = document.getElementById('grid');
+const errBox = document.getElementById('err');
+const badge = document.getElementById('badge');
+const cards = [];
+
+function fail(message){ errBox.style.display='block'; errBox.textContent = message; }
+
+/** 汇总一个 pack 的全部动画名（去重、保序） */
+function animationNames(animations){
+  const names = [];
+  const add = (name) => { if (typeof name === 'string' && name && !names.includes(name)) names.push(name); };
+  for (const key of ['idle','turn','drag','clicks']) (animations[key] || []).forEach(add);
+  (animations.moves?.actions || []).forEach((action) => add(action.name));
+  (animations.categories || []).forEach((category) => (category.actions || []).forEach(add));
+  for (const pool of Object.values(animations.events || {})) (Array.isArray(pool) ? pool : []).forEach(add);
+  return names;
+}
+
+function makeCard(pack, config){
+  const card = document.createElement('article');
+  card.className = 'card';
+  const idle = config.animations?.idle?.[0] || animationNames(config.animations)[0];
+  const names = animationNames(config.animations);
+  const avatar = AVATARS[pack.kind] || (pack.avatar ? `../dist/pet/${pack.avatar}` : '../catalog/pets/dsh/avatar.webp');
+
+  card.innerHTML = `
+    <div class="stage"><video muted autoplay loop playsinline preload="metadata"></video></div>
+    <div class="row">
+      <img class="avatar" alt="" src="${avatar}">
+      <div>
+        <div class="name">${pack.name}</div>
+        <div class="kind">${pack.kind}</div>
+      </div>
+    </div>
+    <div class="meta">
+      <span>${names.length} 个动画</span>
+      <span>${pack.size}px</span>
+      <span>${pack.display}</span>
+      <span>${pack.position?.corner ?? ''}</span>
+    </div>
+    <div class="actions">
+      <button type="button" data-act="next">换动作</button>
+      <button type="button" data-act="idle">回到待机</button>
+    </div>`;
+
+  const video = card.querySelector('video');
+  video.src = `../dist/pet/${pack.kind}-animation/${encodeURIComponent(idle)}.webm`;
+  let index = 0;
+  const play = (name) => {
+    video.src = `../dist/pet/${pack.kind}-animation/${encodeURIComponent(name)}.webm`;
+    video.play().catch(() => {});
+  };
+  card.querySelector('[data-act="next"]').addEventListener('click', () => {
+    index = (index + 1) % Math.max(1, names.length);
+    play(names[index]);
+  });
+  card.querySelector('[data-act="idle"]').addEventListener('click', () => { index = 0; play(idle); });
+  video.addEventListener('error', () => { card.style.outline = '2px solid #c96b6b'; });
+
+  cards.push({ card, idle });
+  return card;
+}
+
+(async () => {
+  try {
+    const response = await fetch('../dist/manifest.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`dist/manifest.json HTTP ${response.status}`);
+    const manifest = await response.json();
+    const packs = (manifest.packs || []).filter((pack) => pack.kind?.startsWith('aboutme-') || pack.kind?.startsWith('xiaoxiao-'));
+    if (packs.length === 0) throw new Error('manifest 里没有找到形象 pack（先跑 node scripts/build.mjs）');
+    const configs = await Promise.all(packs.map(async (pack) => {
+      const res = await fetch(`../dist/pet/${pack.kind}-config.json`, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`${pack.kind}-config.json HTTP ${res.status}`);
+      return res.json();
+    }));
+    packs.forEach((pack, index) => grid.appendChild(makeCard(pack, configs[index])));
+    badge.textContent = `${packs.length} 个形象 · 本地 WebM`;
+  } catch (error) {
+    badge.textContent = '加载失败';
+    fail(`预览数据加载失败：${error.message}\n\n请在 pamper 根目录运行 node scripts/serve.mjs，再用 http://127.0.0.1:8899/preview/all-characters.html 打开（不要直接双击 html 文件）。`);
+  }
+})();
+</script>
+</body>
+</html>

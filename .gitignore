@@ -1,0 +1,15 @@
+# ===== 体积很大的本地素材 / 构建产物（不要提交到 GitHub）=====
+# 完整动作库（1.4 GB 原始精灵图）——发现页改为联网按需下载，不再入库
+assets/pet-store/
+# 精灵图下载缓存（构建时生成，可重建）
+assets/spritesheet-cache/
+# 预转换 WebM 动作库（单独上传到你自己的 assets 仓库，不要放主仓库）
+webm-store/
+# 构建产物（拆成 Release 附件 pets-base.zip）
+dist/
+# 临时构建目录
+.build-tmp/
+release/
+# 依赖 / 系统
+node_modules/
+*.log

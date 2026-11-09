@@ -1,0 +1,5 @@
+{
+  "basePackUrl": "",
+  "assetsBaseUrl": "",
+  "comment": "发布前填写：basePackUrl = pets-base.zip 的 GitHub Release 下载直链；assetsBaseUrl = 你上传 webm-store 的仓库 CDN 根地址（如 https://cdn.jsdelivr.net/gh/<用户名>/<assets仓库>@main）。用户运行 node scripts/install-lite.mjs 时会自动使用这两个地址。"
+}

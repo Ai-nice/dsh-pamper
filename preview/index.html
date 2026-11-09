@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pamper · 多形象预览</title>
+<meta name="description" content="pamper 多形象静态预览：蓝毛小女仆、白龙娘、橙发书娘、紫发猫耳娘，aboutme-pets WebP 精灵图动画，原生 HTML/CSS/JS。">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#eef4ff">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%237c6bff'/%3E%3Ccircle cx='10.5' cy='12' r='2.6' fill='%23fff'/%3E%3Ccircle cx='21.5' cy='12' r='2.6' fill='%23fff'/%3E%3Ccircle cx='16' cy='13' r='2.9' fill='%23fff'/%3E%3Cpath d='M16 17c4 0 6.5 2.6 6.5 5.2 0 2.1-1.7 3.1-3.6 3.1-1.2 0-1.9-.5-2.9-.5s-1.7.5-2.9.5c-1.9 0-3.6-1-3.6-3.1C9.5 19.6 12 17 16 17Z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<noscript>
+  <p class="noscript-tip">此预览页需要启用 JavaScript 才能加载并按帧播放精灵图动画。</p>
+</noscript>
+<div class="app">
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" focusable="false">
+          <circle cx="10" cy="11.5" r="2.8"></circle>
+          <circle cx="22" cy="11.5" r="2.8"></circle>
+          <circle cx="16" cy="10.5" r="3.1"></circle>
+          <path d="M16 16.5c4.6 0 7.5 3 7.5 6 0 2.4-2 3.6-4.2 3.6-1.4 0-2.2-.6-3.3-.6s-1.9.6-3.3.6c-2.2 0-4.2-1.2-4.2-3.6 0-3 2.9-6 7.5-6Z"></path>
+        </svg>
+      </div>
+      <div class="brand-copy">
+        <h1>pamper <span class="brand-scope">多形象预览</span></h1>
+        <p>aboutme-pets 精灵图素材验证 · 原生 HTML / CSS / JS · 无构建</p>
+      </div>
+    </div>
+    <div class="header-tools">
+      <span class="pill" id="manifest-status" data-state="loading" title="正在读取 preview/manifest.json">
+        <span class="pill-dot" aria-hidden="true"></span>
+        <span class="pill-text" id="manifest-status-text">正在加载 manifest…</span>
+      </span>
+      <span class="pill pill-quiet" id="fps-pill" title="页面渲染帧率">– FPS</span>
+      <button class="icon-btn" type="button" id="btn-theme" aria-label="切换深色或浅色主题" title="切换深色或浅色主题">☾</button>
+    </div>
+  </header>
+
+  <nav class="character-strip" id="character-strip" aria-label="形象切换条">
+    <span class="strip-placeholder">正在读取形象列表…</span>
+  </nav>
+
+  <div class="notice" id="notice" data-kind="warn" role="status" hidden>
+    <span class="notice-icon" aria-hidden="true">!</span>
+    <div class="notice-body">
+      <strong class="notice-title" id="notice-title"></strong>
+      <p class="notice-text" id="notice-text"></p>
+    </div>
+    <div class="notice-actions">
+      <button type="button" class="link-btn" id="notice-retry" hidden>重试加载</button>
+      <button type="button" class="icon-btn notice-close" id="notice-close" aria-label="关闭提示" title="关闭提示">×</button>
+    </div>
+  </div>
+
+  <main class="workspace">
+    <section class="stage-panel" aria-label="宠物舞台">
+      <div class="stage" id="stage">
+        <div class="stage-scenery" aria-hidden="true">
+          <div class="orb"></div>
+          <div class="cloud cloud-1"></div>
+          <div class="cloud cloud-2"></div>
+          <div class="cloud cloud-3"></div>
+          <div class="stars"></div>
+          <div class="floor"></div>
+          <div class="vignette"></div>
+        </div>
+
+        <div class="stage-hud">
+          <div class="hud-chip selection-chip" id="selection-chip">未选中形象</div>
+          <div class="hud-chip paused-chip" id="paused-chip" hidden>已暂停</div>
+        </div>
+
+        <div class="stage-loading" id="stage-loading">
+          <span class="spinner" aria-hidden="true"></span>
+          <span id="stage-loading-text">正在载入形象与精灵图…</span>
+        </div>
+
+        <div class="toast" id="toast" role="status"></div>
+
+        <div class="stage-toolbar" role="toolbar" aria-label="舞台控制">
+          <button type="button" class="tool-btn primary" id="btn-add" title="添加一只形象（最多同时 6 只）">
+            <span class="tool-icon" aria-hidden="true">＋</span><span>添加形象</span>
+          </button>
+          <button type="button" class="tool-btn" id="btn-play" aria-pressed="false" title="播放 / 暂停全部动画（空格）">
+            <span class="tool-icon" id="btn-play-icon" aria-hidden="true">⏸</span><span id="btn-play-label">暂停</span>
+          </button>
+          <span class="toolbar-sep" aria-hidden="true"></span>
+          <div class="zoom-group" role="group" aria-label="缩放">
+            <button type="button" class="tool-btn icon-only" id="btn-zoom-out" title="缩小（选中形象；未选中则全部）" aria-label="缩小">－</button>
+            <span class="zoom-readout" id="zoom-readout" title="缩放比例">—</span>
+            <button type="button" class="tool-btn icon-only" id="btn-zoom-in" title="放大（选中形象；未选中则全部）" aria-label="放大">＋</button>
+          </div>
+          <span class="toolbar-sep" aria-hidden="true"></span>
+          <button type="button" class="tool-btn" id="btn-reset" title="恢复默认 4 只形象与初始布局（会移除新增形象）">
+            <span class="tool-icon" aria-hidden="true">↺</span><span>重置布局</span>
+          </button>
+        </div>
+        <p class="stage-hint">点击宠物播放动作 · 拖拽移动 · 滚轮缩放 · 点击空白取消选择 · 空格暂停</p>
+      </div>
+    </section>
+
+    <aside class="sidebar" aria-label="动作库">
+      <section class="panel actions-panel">
+        <header class="panel-head">
+          <div class="panel-title">
+            <h2>动作库</h2>
+            <p id="actions-subtitle">正在载入…</p>
+          </div>
+          <span class="count-badge" id="actions-count">0</span>
+        </header>
+        <div class="search-row">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <input id="action-search" type="search" placeholder="搜索动作名（如：挥手 / 舞 / 待机）" autocomplete="off" aria-label="搜索动作">
+        </div>
+        <div class="quick-row">
+          <button type="button" class="ghost-btn" id="btn-random" title="从上架动作中随机播放一个">随机动作</button>
+          <button type="button" class="ghost-btn" id="btn-idle" title="让目标形象回到待机动作">回到待机</button>
+        </div>
+        <p class="panel-hint">点击动作优先作用于选中宠物；未选中时作用于当前形象的全部实例。</p>
+        <div class="action-list" id="action-list"></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="app-footer" id="readme">
+    <div class="footer-head">
+      <h2>关于此预览页</h2>
+      <span class="muted">静态页 · 无需构建 · 不加载第三方 JS</span>
+    </div>
+    <div class="footer-grid">
+      <section class="readme-card">
+        <h3>如何打开</h3>
+        <p>页面通过 HTTP 加载 <code>manifest.json</code> 并直连 jsDelivr CDN，请用静态服务器打开：</p>
+        <pre><code>cd "pamper"
+node scripts/serve.mjs
+# 浏览器打开 http://127.0.0.1:8899/preview/
+
+# 在 preview/ 目录下时等价于：
+# node ../scripts/serve.mjs</code></pre>
+        <p>也可用任意静态服务器（如 <code>npx serve .</code>、<code>python -m http.server</code>）。直接双击页面以 <code>file://</code> 打开时，浏览器会拦截本地 JSON 请求，页面会显示失败原因。</p>
+      </section>
+      <section class="readme-card">
+        <h3>数据来源</h3>
+        <p>形象与动作来自 <a href="https://github.com/hunmer/aboutme-pets" target="_blank" rel="noreferrer">aboutme-pets</a> 素材商店，精灵图由 jsDelivr 远程加载；<code>preview/manifest.json</code> 由项目脚本生成，页头会显示加载状态与动作数量。</p>
+        <p class="muted" id="footer-manifest-info">manifest：加载中…</p>
+      </section>
+      <section class="readme-card">
+        <h3>素材许可</h3>
+        <p>aboutme-pets 素材<strong>禁止商用</strong>；蓝毛小女仆素材来自 dsh-pet（CC BY-NC-SA 4.0，此处仅作预览演示）；本页代码 MIT。</p>
+        <p>预览页只读取公开 CDN，不会写入或修改任何素材。</p>
+      </section>
+      <section class="readme-card">
+        <h3>已知限制</h3>
+        <p>精灵图为超大拼图（单张约 42MP、1–2.5MB），首次播放某动作需从 CDN 下载并解码；为控制内存，页面按约 0.65 倍解码，极大倍率放大时会略软。需要支持 WebP 的现代浏览器；CDN 较慢时点击动作会有加载延迟。</p>
+      </section>
+    </div>
+  </footer>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
