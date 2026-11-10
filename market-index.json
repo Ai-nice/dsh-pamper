@@ -38,11 +38,11 @@
       "versions": [
         {
           "version": "0.1.0",
-          "publishTimestamp": 1794282579,
+          "publishTimestamp": 1794297892,
           "source": {
             "type": "git",
             "url": "https://github.com/Ai-nice/dsh-pamper",
-            "commit": "8ae4e772915328e0a4c4e065fcb7d129ccc0b386",
+            "commit": "a260583a30be00ac669c966631d4be7b93248e87",
             "path": "plugins/dsh-pamper"
           },
           "engines": {
