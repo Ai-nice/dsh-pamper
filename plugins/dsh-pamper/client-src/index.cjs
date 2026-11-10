@@ -6,19 +6,22 @@ const t = (key) => (dicts.zh && dicts.zh[key]) || key;
 const h = React.createElement;
 
 function apply(ctx) {
-  const PetConfigSection = makePetConfigSection({
-    h,
-    useState: React.useState,
-    useEffect: React.useEffect,
-    useRef: React.useRef,
-    useCallback: React.useCallback,
-    t
-  }, ctx);
+  const PetConfigHost = () => {
+    const [Section] = React.useState(() => makePetConfigSection({
+      h,
+      useState: React.useState,
+      useEffect: React.useEffect,
+      useRef: React.useRef,
+      useCallback: React.useCallback,
+      t
+    }, ctx));
+    return Section ? h(Section, {}) : null;
+  };
   const { LovePanel, LoveIcon } = createLoveEntry({
     h,
     useEffect: React.useEffect,
     useRef: React.useRef,
-    PetConfigSection,
+    PetConfigSection: PetConfigHost,
     ROUTE_PATH: '/dsh-pamper-7470'
   });
   ctx.slots.inject('sidebar.panellist', function* () {

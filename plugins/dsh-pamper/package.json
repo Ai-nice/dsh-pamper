@@ -1,6 +1,6 @@
 {
   "name": "dsh-pamper",
-  "version": "0.5.2",
+  "version": "0.6.0-dev.7",
   "type": "module",
   "description": "完全独立的 pamper 宠爱插件：自有宠爱页面（角色/桌宠配置/发现）、页面内宠物浮层、动作按需下载；不依赖 dsh-pet。",
   "exports": {
@@ -25,7 +25,10 @@
     },
     "client": {
       "platform": "web",
-      "immediately": true
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-connection"
+      ]
     }
   },
   "author": "Ai-nice",

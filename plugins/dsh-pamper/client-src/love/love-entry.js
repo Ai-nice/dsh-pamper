@@ -1,5 +1,18 @@
 /* Extracted from scripts/patch-dsh-pet.mjs; adapted for the independent client. */
 export function createLoveEntry({ h, useEffect, useRef, PetConfigSection, ROUTE_PATH }) {
+
+  const PET_GROUP_OF = {
+    main: 'deepseek',
+    'aboutme-dragon': 'GPT',
+    'xiaoxiao-bailong': 'GPT',
+    'aboutme-claude': 'Claude',
+    'xiaoxiao-ojousama': 'Claude',
+    'aboutme-gemini': 'Gemini',
+    'xiaoxiao-huangmao': 'kimi',
+    'xiaoxiao-heihu': '其他',
+    'xiaoxiao-naicha': '其他'
+  };
+  const petGroupOf = (root) => PET_GROUP_OF[root] || '其他';
 			// —— pamper 补丁：主菜单「宠爱」入口 + 角色/配置双页（原生 DOM 渲染）——
 			const LoveIcon = ({ size = 18 }) => h("svg", {
 				width: size,

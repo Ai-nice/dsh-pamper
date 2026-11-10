@@ -362,6 +362,21 @@ export function apply(ctx) {
   };
   void ensureMigrated(ctx);
 
+  const readConfigMap = async () => {
+    const entries = await readdir(petsDir()).catch(() => []);
+    const merged = {};
+    for (const entry of entries) {
+      if (!entry.endsWith('-config.json')) continue;
+      const kind = entry.slice(0, -'-config.json'.length);
+      try { merged[kind] = await loadConfig(kind); } catch {}
+    }
+    return merged;
+  };
+  const writeConfigMap = async (merged) => {
+    for (const [kind, config] of Object.entries(merged)) {
+      if (/^[a-z0-9_-]+$/i.test(kind)) await saveConfig(kind, config);
+    }
+  };
   const buildDesktopState = async () => {
     const pets = (await listPacks()).filter((item) => item.display && item.idle);
     const state = { pets: [] };
@@ -405,6 +420,80 @@ export function apply(ctx) {
         await ensureBaseInstalled(ctx);
         const entries = await readdir(petsDir()).catch(() => []);
         return sendJson(res, 200, { ok: true, characters: entries.filter((name) => name.endsWith('-config.json')).length });
+      }
+      if (req.method === 'GET' && path === 'thumb') {
+        const pack = url.searchParams.get('pack') || '';
+        const name = url.searchParams.get('name') || '';
+        const catalog = await loadCatalog();
+        const action = catalog.characters.flatMap((character) => character.actions).find((item) => item.pack === pack && item.name === name);
+        if (!action || typeof action.thumb !== 'string') return sendText(res, 404, 'not found');
+        const match = action.thumb.match(/^data:image\/([a-z]+);base64,(.*)$/);
+        if (!match) return sendText(res, 404, 'not found');
+        const buffer = Buffer.from(match[2], 'base64');
+        res.statusCode = 200;
+        res.setHeader('content-type', 'image/' + match[1]);
+        res.setHeader('cache-control', 'public, max-age=3600');
+        return res.end(buffer);
+      }
+      if (req.method === 'GET' && path === 'config') return sendJson(res, 200, await readConfigMap());
+      if (req.method === 'GET' && path === 'config/meta') {
+        return sendJson(res, 200, { user: statePath(), default: '', animations: petsDir(), storage: [] });
+      }
+      if (req.method === 'GET' && path === 'models') return sendJson(res, 200, { providers: [] });
+      if (req.method === 'POST' && path === 'config') return sendJson(res, 200, await readConfigMap());
+      if (req.method === 'PUT' && path === 'config') {
+        const body = await readBody(req);
+        const merged = await readConfigMap();
+        if (!merged.main) return sendJson(res, 200, { ok: false, reason: 'bad-request', message: 'main missing' });
+        if (Array.isArray(body.pets)) merged.main.pets = body.pets;
+        for (const [key, value] of Object.entries(body)) {
+          if (key === 'pets') continue;
+          if (value !== undefined && value !== null) merged.main[key] = value;
+        }
+        await writeConfigMap({ main: merged.main });
+        await refreshDesktopIfRunning();
+        return sendJson(res, 200, await readConfigMap());
+      }
+      if (req.method === 'POST' && path === 'pet-config') {
+        const body = await readBody(req);
+        const entry = String(body.entry || '');
+        if (!/^[a-z0-9_-]+$/i.test(entry)) return sendJson(res, 200, { ok: false, reason: 'bad-request', message: 'bad entry' });
+        const merged = await readConfigMap();
+        if (!merged[entry]) return sendJson(res, 200, { ok: false, reason: 'unknown-entry', message: 'unknown entry' });
+        if (Array.isArray(body.pets)) merged[entry].pets = body.pets;
+        await saveConfig(entry, merged[entry]);
+        await refreshDesktopIfRunning();
+        return sendJson(res, 200, await readConfigMap());
+      }
+      if (req.method === 'POST' && path === 'pet-display') {
+        const body = await readBody(req);
+        const id = String(body.id || '');
+        const display = body.display === 'none' ? 'none' : 'desktop';
+        const merged = await readConfigMap();
+        let changed = false;
+        for (const config of Object.values(merged)) {
+          for (const pet of Array.isArray(config.pets) ? config.pets : []) {
+            if (pet.id === id) { pet.display = display; changed = true; }
+          }
+        }
+        if (changed) await writeConfigMap(merged);
+        try {
+          if (display === 'desktop' && (!desktopChild || desktopChild.exitCode !== null)) await launchDesktop();
+          else await refreshDesktopIfRunning();
+        } catch (error) {
+          ctx.logger?.warn?.('[dsh-pamper] 桌面模式启动失败：' + (error instanceof Error ? error.message : String(error)));
+        }
+        return sendJson(res, 200, { ok: true, display });
+      }
+      if (req.method === 'GET' && path === 'logo') {
+        const kind = url.searchParams.get('root') || '';
+        const entries = await readdir(petsDir()).catch(() => []);
+        const avatar = entries.find((name) => name.startsWith(kind + '-avatar.'));
+        if (!avatar) return sendText(res, 404, 'not found');
+        const ext = extname(avatar).toLowerCase();
+        res.statusCode = 200;
+        res.setHeader('content-type', ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/webp');
+        return res.end(await readFile(join(petsDir(), avatar)));
       }
       if (req.method === 'GET' && path === 'characters') return sendJson(res, 200, { characters: await listPacks(), dataRoot: ownRoot() });
       if (req.method === 'GET' && path === 'avatar') {
@@ -460,7 +549,7 @@ export function apply(ctx) {
         await refreshDesktopIfRunning();
         return sendJson(res, 200, { ok: true, display: pet.display });
       }
-      if (req.method === 'POST' && path === 'config') {
+      if (req.method === 'POST' && path === 'character-config') {
         const body = await readBody(req);
         const kind = String(body.kind || '');
         if (!/^[a-z0-9_-]+$/i.test(kind)) return sendJson(res, 400, { ok: false, error: 'bad kind' });
@@ -478,6 +567,11 @@ export function apply(ctx) {
       }
       if (req.method === 'POST' && path === 'load') {
         const body = await readBody(req);
+        if (body.character && Array.isArray(body.actionIds)) {
+          const map = { maid: 'main', gpt: 'aboutme-dragon', claude: 'aboutme-claude', gemini: 'aboutme-gemini' };
+          body.kind = map[body.character] || body.kind;
+          body.actions = body.actionIds;
+        }
         const kind = String(body.kind || '');
         const names = Array.isArray(body.actions) ? body.actions : [];
         const catalog = await loadCatalog();
@@ -496,7 +590,7 @@ export function apply(ctx) {
           }
         }
         await saveConfig(kind, config);
-        return sendJson(res, 200, { ok: true, loaded: done, failed });
+        return sendJson(res, 200, { ok: true, loaded: done, converted: done.length, remote: 0, failed, reloaded: true });
       }
       if (req.method === 'POST' && path === 'unload') {
         const body = await readBody(req);

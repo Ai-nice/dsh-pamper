@@ -26,7 +26,7 @@ export const PET_REF_WIDTH = 462;
  * 宿主注册的路由段：服务端路径，永远不带浏览器挂载前缀。
  * 路由注册、匹配与桌面/独立模式拼地址都用它；带了前缀的地址在服务端是错的路由。
  */
-export const ROUTE_SEGMENT = '/dsh-pet-7340';
+export const ROUTE_SEGMENT = '/dsh-pamper-7470';
 
 /**
  * 从文档基准地址取出挂载前缀（baseURI 的目录部分）。
