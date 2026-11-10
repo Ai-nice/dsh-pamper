@@ -240,7 +240,7 @@ window.__ModuleLoader__.load({
       inject: ['slots'],
       apply(ctx) {
         ctx.slots.inject('sidebar.panellist', function* () {
-          yield ctx.slots.register({ name: 'sidebar.panellist', id: 'pamper', order: 4, label: () => '宠爱' }, LoveIcon);
+          yield ctx.slots.register({ name: 'sidebar.panellist', id: 'pamper', order: 4, label: () => '宠爱（独立）' }, LoveIcon);
         });
         ctx.slots.inject('main', function* () {
           yield ctx.slots.register({ name: 'main', key: 'pamper' }, Panel);
