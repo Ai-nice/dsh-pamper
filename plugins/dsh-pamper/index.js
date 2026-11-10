@@ -347,6 +347,14 @@ async function downloadAction(ctx, action) {
 let baseInstallPromise = null;
 export function apply(ctx) {
   let desktopChild = null;
+  const stopDesktop = () => {
+    if (desktopChild && desktopChild.exitCode === null) {
+      if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(desktopChild.pid), '/T', '/F'], { windowsHide: true });
+      else desktopChild.kill();
+    }
+    desktopChild = null;
+  };
+  ctx.effect(() => () => stopDesktop());
   let catalogPromise = null;
   const loadCatalog = async () => {
     if (!catalogPromise) catalogPromise = readFile(CATALOG_PATH, 'utf8').then(JSON.parse);
@@ -476,11 +484,7 @@ export function apply(ctx) {
         return sendJson(res, 200, { ok: true, running: Boolean(desktopChild && desktopChild.exitCode === null), pid: desktopChild?.pid || null, mode: 'wpf-frames' });
       }
       if (req.method === 'POST' && path === 'desktop/stop') {
-        if (desktopChild && desktopChild.exitCode === null) {
-          if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(desktopChild.pid), '/T', '/F'], { windowsHide: true });
-          else desktopChild.kill();
-        }
-        desktopChild = null;
+        stopDesktop();
         return sendJson(res, 200, { ok: true, running: false });
       }
       if (req.method === 'POST' && path === 'desktop/start') {
