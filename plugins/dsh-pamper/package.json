@@ -1,24 +1,33 @@
 {
   "name": "dsh-pamper",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
-  "description": "Pamper 桌宠动作库：发现并按需下载/安装透明 WebM 动作。",
+  "description": "独立桌宠插件：宠爱页面 + 页面内宠物显示，动作按需从 CDN 下载（不依赖 dsh-pet）。",
   "exports": {
     ".": "./index.js",
+    "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
     "index.js",
+    "client.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
     "catalog/action-store.json",
-    "patcher/**"
+    "cleanup/**"
   ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-connection"
+      ]
     }
   },
   "author": "Ai-nice",
