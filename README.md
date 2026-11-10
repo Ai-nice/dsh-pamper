@@ -16,6 +16,23 @@
 
 > **项目最终位置：`D:\PC\DSH\pamper`。** 下文命令均以该项目根目录为当前目录执行。
 
+## DSH 插件市场（自定义索引）
+
+官方目前**没有公共插件索引**；其他插件也是通过「索引源」被发现。添加下面这个索引地址后，就能在插件市场里直接搜索并安装 **pamper**：
+
+```text
+https://raw.githubusercontent.com/Ai-nice/dsh-pamper/main/market-index.json
+```
+
+步骤：
+
+1. 打开 DSH 侧栏 **插件**；
+2. 若没有「发现」标签页：在实验性插件中启用 **自定义插件索引**（`@deepseek-ai/dsh-experimental-plugin-market-bundle`）；
+3. **发现 → 添加索引源**，粘贴上面的 URL；
+4. 搜索 **pamper**，点安装（包名 `dsh-pamper`，来自 GitHub 仓库 `plugin/dsh-pamper`）。
+
+> 安装的是动作库插件（发现页动作按需加载的后端）。宠爱页面的 UI 补丁仍由项目里的 `scripts/patch-dsh-pet.mjs` 提供；基础形象包在 Release 的 `pets-base.zip`。
+
 ## GitHub 轻量发布 / 快速安装（三层结构）
 
 本项目已按「轻仓库 + Release 基础包 + 联网按需动作」整理：
