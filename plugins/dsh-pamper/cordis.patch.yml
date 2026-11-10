@@ -1,6 +1,4 @@
 - insert:
     - id: dsh-pamper
       name: dsh-pamper
-      config:
-        assetBaseUrl: 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main'
-        cacheRoot: ''
+      config: {}

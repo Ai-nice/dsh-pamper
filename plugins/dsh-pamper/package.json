@@ -1,8 +1,8 @@
 {
   "name": "dsh-pamper",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "type": "module",
-  "description": "宠爱页面套件：自动给 dsh-pet 打补丁，提供角色/桌宠配置/发现页与动作按需下载。",
+  "description": "完全独立的 pamper 宠爱插件：自有宠爱页面（角色/桌宠配置/发现）、页面内宠物浮层、动作按需下载；不依赖 dsh-pet。",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -15,8 +15,7 @@
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
-    "catalog/action-store.json",
-    "patcher/**"
+    "catalog/action-store.json"
   ],
   "dsh": {
     "bundle": {
