@@ -1,0 +1,55 @@
+{
+  "format": 1,
+  "title": {
+    "en": "Ai-nice Pamper",
+    "zh": "Ai-nice Pamper"
+  },
+  "description": {
+    "en": "Pamper desktop pet plugin: browse 819 actions and load them on demand.",
+    "zh": "pamper 桌宠插件：浏览 819 个动作并按需下载加载。"
+  },
+  "metadata": {},
+  "plugins": [
+    {
+      "name": "dsh-pamper",
+      "title": {
+        "en": "Pamper action store",
+        "zh": "pamper 动作库"
+      },
+      "description": {
+        "en": "Browse 819 desktop-pet actions and load them on demand.",
+        "zh": "浏览 819 个桌宠动作，按需下载加载。"
+      },
+      "icon": "https://raw.githubusercontent.com/Ai-nice/dsh-pamper/main/plugin/dsh-pamper/icon.svg",
+      "author": "Ai-nice",
+      "homepage": "https://github.com/Ai-nice/dsh-pamper",
+      "repository": {
+        "url": "https://github.com/Ai-nice/dsh-pamper",
+        "directory": "plugin/dsh-pamper"
+      },
+      "metadata": {
+        "keywords": [
+          "desktop pet",
+          "dsh-pet",
+          "actions"
+        ],
+        "labels": []
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1794282579,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/Ai-nice/dsh-pamper",
+            "commit": "8ae4e772915328e0a4c4e065fcb7d129ccc0b386",
+            "path": "plugin/dsh-pamper"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        }
+      ]
+    }
+  ]
+}
