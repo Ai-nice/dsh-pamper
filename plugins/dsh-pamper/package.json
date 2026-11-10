@@ -1,6 +1,6 @@
 {
   "name": "dsh-pamper",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "description": "宠爱页面套件：自动给 dsh-pet 打补丁，提供角色/桌宠配置/发现页与动作按需下载。",
   "exports": {
