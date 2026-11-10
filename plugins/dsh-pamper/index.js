@@ -2,9 +2,10 @@
  * dsh-pamper 0.4.0：完全独立的宠爱插件。
  * 不读取/修改 dsh-pet 运行文件；首次启动只读复制 dsh-pet 的角色配置到自己的数据目录。
  */
-import { copyFile, cp, mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { basename, dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,6 +15,7 @@ export const inject = ['webServer'];
 const ROUTE = '/dsh-pamper-7470';
 const CATALOG_PATH = fileURLToPath(new URL('./catalog/action-store.json', import.meta.url));
 const ASSET_BASE = 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main';
+const BASE_PACK_URL = 'https://github.com/Ai-nice/dsh-pamper/releases/download/v1.0.0/pets-base-v2.zip';
 const GROUP_OF = (kind) => {
   if (kind === 'main') return 'deepseek';
   if (kind.startsWith('aboutme-dragon')) return 'GPT';
@@ -51,6 +53,45 @@ const readBody = async (req) => {
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const writeJson = async (path, value) => writeFile(path, JSON.stringify(value, null, 2) + '\n');
 
+async function downloadBasePack(ctx) {
+  const zipPath = join(ownRoot(), 'base-pack.zip');
+  try {
+    if (!(await isFile(zipPath))) {
+      ctx.logger?.info?.('[dsh-pamper] 正在下载基础形象包（首次约 345MB）…');
+      let lastError = null;
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        try {
+          const response = await fetch(BASE_PACK_URL, { signal: AbortSignal.timeout(600000) });
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          if (buffer.length < 1024 * 1024) throw new Error('下载文件过小');
+          await writeFile(zipPath, buffer);
+          break;
+        } catch (error) {
+          lastError = error;
+          await rm(zipPath, { force: true });
+          if (attempt < 5) await new Promise((resolveDelay) => setTimeout(resolveDelay, 1000 * attempt));
+        }
+      }
+      if (!(await isFile(zipPath))) throw new Error('基础包下载失败：' + (lastError?.message || ''));
+    }
+    const temp = join(ownRoot(), '.extract');
+    await rm(temp, { recursive: true, force: true });
+    await mkdir(temp, { recursive: true });
+    const result = spawnSync('tar', ['-xf', zipPath, '-C', temp], { windowsHide: true });
+    if (result.status !== 0) throw new Error('解压失败：' + String(result.stderr || ''));
+    const candidates = [join(temp, 'pet'), join(temp, 'pets'), join(temp, 'dist', 'pet'), join(temp, 'dist', 'pets')];
+    let source = '';
+    for (const candidate of candidates) if (existsSync(candidate)) { source = candidate; break; }
+    if (!source) throw new Error('基础包结构不识别（找不到 pet/pets 目录）');
+    await cp(source, petsDir(), { recursive: true, force: false, errorOnExist: false });
+    await rm(temp, { recursive: true, force: true });
+    ctx.logger?.info?.('[dsh-pamper] 基础形象包安装完成');
+  } catch (error) {
+    ctx.logger?.warn?.('[dsh-pamper] 基础形象包安装失败：' + (error instanceof Error ? error.message : String(error)));
+  }
+}
+
 async function ensureMigrated(ctx) {
   await mkdir(petsDir(), { recursive: true });
   const entries = await readdir(petsDir()).catch(() => []);
@@ -66,6 +107,8 @@ async function ensureMigrated(ctx) {
     }
   }
   await migrateMainPack(ctx);
+  const after = await readdir(petsDir()).catch(() => []);
+  if (!after.some((name) => name.endsWith('-config.json'))) await downloadBasePack(ctx);
 }
 
 
