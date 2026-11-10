@@ -6,7 +6,7 @@
     html, body { margin: 0; width: 100%; height: 100%; background: #00ff00; overflow: hidden; }
     #stage { position: fixed; inset: 0; pointer-events: none; }
     .pet { position: absolute; display: block; }
-    .pet video { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .pet img { display: block; width: 100%; height: 100%; object-fit: contain; }
   </style>
 </head>
 <body>
@@ -28,19 +28,12 @@
       const my = Number(pet.marginY) || 100;
       if (corner.includes('left')) holder.style.left = mx + 'px'; else holder.style.right = mx + 'px';
       if (corner.includes('bottom')) holder.style.bottom = my + 'px'; else holder.style.top = my + 'px';
-      const video = document.createElement('video');
-      video.muted = true;
-      video.loop = true;
-      video.playsInline = true;
-      video.autoplay = true;
-      video.preload = 'auto';
-      video.addEventListener('loadeddata', () => { video.play().catch((error) => console.error('play failed', error)); });
-      video.addEventListener('canplay', () => { video.play().catch((error) => console.error('play failed', error)); });
-      video.addEventListener('error', () => console.error('video error', video.src, video.error && video.error.message));
-      video.src = toFileUrl(pet.file);
-      holder.appendChild(video);
+      const image = document.createElement('img');
+      image.src = toFileUrl(pet.file.replace(/\.webm$/i, '.png'));
+      image.addEventListener('error', () => console.error('image error', image.src));
+      holder.appendChild(image);
       stage.appendChild(holder);
-      console.log('pamper helper: pet', pet.kind, video.src);
+      console.log('pamper helper: pet', pet.kind, image.src);
     }
   </script>
 </body>

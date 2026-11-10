@@ -9,6 +9,7 @@ import { homedir } from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
 import { basename, dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 export const name = 'dsh-pamper';
 export const inject = ['webServer'];
@@ -56,6 +57,23 @@ const readBody = async (req) => {
 };
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const writeJson = async (path, value) => writeFile(path, JSON.stringify(value, null, 2) + '\n');
+
+async function ensureFrames(ctx, kind, action) {
+  const safe = action.replace(/[\\/:*?"<>|]/g, '_');
+  const dir = join(ownRoot(), 'desktop-frames', kind, safe);
+  const existing = (await readdir(dir).catch(() => [])).filter((name) => name.endsWith('.png')).sort();
+  if (existing.length > 0) return existing.map((name) => join(dir, name));
+  const webm = join(petsDir(), kind + '-animation', action + '.webm');
+  if (!existsSync(webm)) throw new Error('动画文件不存在：' + webm);
+  await mkdir(dir, { recursive: true });
+  let ffmpeg = process.env.PAMPER_FFMPEG || '';
+  if (!ffmpeg) { try { ffmpeg = createRequire(import.meta.url)('@ffmpeg-installer/ffmpeg').path; } catch {} }
+  if (!ffmpeg) ffmpeg = 'ffmpeg';
+  const result = spawnSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', webm, '-vf', 'fps=12,scale=360:-1:flags=lanczos', '-pix_fmt', 'rgba', join(dir, 'frame-%04d.png')], { windowsHide: true });
+  if (result.status !== 0) throw new Error('ffmpeg 转换失败，请安装 ffmpeg 或设置 PAMPER_FFMPEG');
+  const after = (await readdir(dir)).filter((name) => name.endsWith('.png')).sort();
+  return after.map((name) => join(dir, name));
+}
 
 async function ensureElectron(ctx) {
   const targetDir = join(ownRoot(), 'electron');
@@ -420,7 +438,7 @@ export function apply(ctx) {
         return sendJson(res, 200, { ok: true, removed: names.length });
       }
       if (req.method === 'GET' && path === 'desktop/status') {
-        return sendJson(res, 200, { ok: true, running: Boolean(desktopChild && desktopChild.exitCode === null), pid: desktopChild?.pid || null, electron: await isFile(join(ownRoot(), 'electron', process.platform === 'win32' ? 'electron.exe' : 'electron')) });
+        return sendJson(res, 200, { ok: true, running: Boolean(desktopChild && desktopChild.exitCode === null), pid: desktopChild?.pid || null, mode: 'wpf-frames' });
       }
       if (req.method === 'POST' && path === 'desktop/stop') {
         if (desktopChild && desktopChild.exitCode === null) {
@@ -431,24 +449,27 @@ export function apply(ctx) {
         return sendJson(res, 200, { ok: true, running: false });
       }
       if (req.method === 'POST' && path === 'desktop/start') {
-        const exe = await ensureElectron(ctx);
         const pets = (await listPacks()).filter((item) => item.display && item.idle);
         if (pets.length === 0) return sendJson(res, 400, { ok: false, error: '没有正在显示的角色' });
         if (desktopChild && desktopChild.exitCode === null) {
           if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(desktopChild.pid), '/T', '/F'], { windowsHide: true });
           else desktopChild.kill();
         }
-        const state = {
-          pets: pets.map((item) => ({
-            kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner,
-            marginX: item.marginX, marginY: item.marginY,
-            file: join(petsDir(), item.kind + '-animation', item.idle + '.webm')
-          })).filter((pet) => fs.existsSync(pet.file))
-        };
-        await writeJson(join(ownRoot(), 'desktop-state.json'), state);
-        const env = { ...process.env, PAMPER_DESKTOP_STATE: join(ownRoot(), 'desktop-state.json') };
-        delete env.ELECTRON_RUN_AS_NODE;
-        desktopChild = spawn(exe, ['--no-sandbox', HELPER_DIR], { env, cwd: ownRoot(), windowsHide: false, stdio: 'ignore' });
+        const state = { pets: [] };
+        for (const item of pets) {
+          try {
+            const frames = await ensureFrames(ctx, item.kind, item.idle);
+            state.pets.push({ kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner, marginX: item.marginX, marginY: item.marginY, frames });
+          } catch (error) {
+            ctx.logger?.warn?.('[dsh-pamper] 桌面模式准备失败 ' + item.kind + '：' + (error instanceof Error ? error.message : String(error)));
+          }
+        }
+        if (state.pets.length === 0) return sendJson(res, 500, { ok: false, error: '没有可转换的桌面动画（需要 ffmpeg）' });
+        const stateFile = join(ownRoot(), 'desktop-state.json');
+        await writeJson(stateFile, state);
+        const script = join(HELPER_DIR, 'desktop.ps1');
+        desktopChild = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-StatePath', stateFile], { cwd: ownRoot(), windowsHide: false, stdio: ['ignore', 'ignore', 'pipe'] });
+        desktopChild.stderr?.on('data', (chunk) => { try { fs.appendFileSync(join(ownRoot(), 'desktop-helper.log'), String(chunk)); } catch {} });
         desktopChild.once('exit', () => { desktopChild = null; });
         return sendJson(res, 200, { ok: true, running: true, pid: desktopChild.pid, count: state.pets.length });
       }
