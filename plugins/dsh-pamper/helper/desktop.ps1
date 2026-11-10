@@ -60,6 +60,7 @@ foreach ($pet in @($state.pets)) {
     $bitmap.CacheOption = 'OnLoad'
     $bitmap.EndInit()
     $image.Source = $bitmap
+    [System.Windows.Automation.AutomationProperties]::SetHelpText($image, [string]$i)
   }
   & $loadFrame 0
   $timer = New-Object System.Windows.Threading.DispatcherTimer

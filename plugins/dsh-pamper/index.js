@@ -374,6 +374,25 @@ export function apply(ctx) {
         res.setHeader('cache-control', 'public, max-age=3600');
         return res.end(await readFile(file));
       }
+      if (req.method === 'POST' && path === 'toggleAll') {
+        const body = await readBody(req);
+        const visible = Boolean(body.visible);
+        const entries = await readdir(petsDir()).catch(() => []);
+        const results = [];
+        for (const entry of entries) {
+          if (!entry.endsWith('-config.json')) continue;
+          const kind = entry.slice(0, -'-config.json'.length);
+          try {
+            const config = await loadConfig(kind);
+            const pet = config.pets?.[0];
+            if (!pet) continue;
+            pet.display = visible ? 'desktop' : 'none';
+            await saveConfig(kind, config);
+            results.push(kind);
+          } catch {}
+        }
+        return sendJson(res, 200, { ok: true, visible, count: results.length });
+      }
       if (req.method === 'POST' && path === 'toggle') {
         const body = await readBody(req);
         const kind = String(body.kind || '');

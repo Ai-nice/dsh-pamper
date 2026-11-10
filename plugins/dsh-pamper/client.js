@@ -70,6 +70,7 @@ window.__ModuleLoader__.load({
       const [group, setGroup] = useState('全部');
       const [category, setCategory] = useState('全部');
       const [message, setMessage] = useState('');
+      const [detail, setDetail] = useState(null);
       const [desktop, setDesktop] = useState(false);
       const refreshDesktop = async () => {
         try { setDesktop(Boolean((await api('/desktop/status')).running)); } catch {}
@@ -158,6 +159,7 @@ window.__ModuleLoader__.load({
                     h('div', { style: { fontSize: '16px', fontWeight: 700, color: '#16233d' } }, character.name),
                     h('div', { style: { fontSize: '12px', color: '#5b6b8a', marginTop: '4px' } }, character.group + ' · ' + character.actionCount + ' 个动作 · ' + (character.display ? '正在陪伴' : '已隐藏'))
                   ),
+                  h('button', { type: 'button', onClick: () => setDetail(character), style: { border: '1px solid rgba(15,35,80,.14)', borderRadius: '8px', padding: '5px 9px', background: '#fff', color: '#3b4a66', cursor: 'pointer', fontSize: '12px' } }, '详情'),
                   h('button', { type: 'button', onClick: () => void toggle(character), style: { width: '46px', height: '26px', borderRadius: '999px', border: 'none', cursor: 'pointer', background: character.display ? '#2f6bff' : '#e5e7eb', position: 'relative' } },
                     h('span', { style: { position: 'absolute', top: '3px', left: character.display ? '23px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: character.display ? '#fff' : '#d4d7dc' } }))
                 )
@@ -203,7 +205,20 @@ window.__ModuleLoader__.load({
               )
             )))
           ) : null
-        )
+        ),
+        detail ? h('div', { style: { position: 'fixed', inset: 0, background: 'rgba(15,23,42,.28)', zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' } },
+          h('div', { style: { width: 'min(560px, calc(100vw - 40px))', maxHeight: '80vh', overflowY: 'auto', background: '#fff', borderRadius: '16px', padding: '20px 22px', boxShadow: '0 24px 60px rgba(15,23,42,.28)' } },
+            h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } },
+              h('div', { style: { fontSize: '18px', fontWeight: 700, color: '#16233d' } }, detail.name + ' · 详情'),
+              h('button', { type: 'button', onClick: () => setDetail(null), style: { border: 'none', background: 'transparent', fontSize: '20px', cursor: 'pointer', color: '#5b6b8a' } }, '×')
+            ),
+            h('div', { style: { fontSize: '13px', color: '#5b6b8a', marginBottom: '12px' } }, detail.group + ' · ' + detail.actionCount + ' 个动作 · ' + (detail.display ? '正在陪伴' : '已隐藏')),
+            h('div', { style: { fontSize: '13px', fontWeight: 600, color: '#16233d', marginBottom: '6px' } }, '已加载动作'),
+            (detail.loadedActions || []).length === 0
+              ? h('div', { style: { fontSize: '13px', color: '#8a94a8' } }, '还没有加载动作')
+              : h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px' } }, (detail.loadedActions || []).map((name) => h('span', { key: name, style: { display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#f4f7fb', borderRadius: '999px', padding: '4px 8px 4px 12px', fontSize: '12px', color: '#3b4a66' } }, name, h('button', { type: 'button', onClick: async () => { try { await post('/unload', { kind: detail.kind, actions: [name] }); const next = await api('/characters'); const updated = (next.characters || []).find((item) => item.kind === detail.kind); setDetail(updated || null); await refresh(); } catch (error) { setMessage('卸载失败：' + error.message); } }, style: { border: 'none', background: 'transparent', cursor: 'pointer', color: '#8a94a8', fontSize: '14px' } }, '×'))))
+          )
+        ) : null
       );
     }
 
