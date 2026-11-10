@@ -1,81 +1,187 @@
-param([string]$StatePath)
-Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
+﻿param([string]$StatePath)
+Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Windows.Forms
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
-public class PamperWin {
-  [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int index);
-  [DllImport("user32.dll")] public static extern int SetWindowLong(IntPtr h, int index, int value);
+public class PamperTop {
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
 }
 '@
-$state = Get-Content -Raw -Encoding UTF8 -LiteralPath $StatePath | ConvertFrom-Json
-$window = New-Object System.Windows.Window
-$window.Title = 'pamper-desktop-helper'
-$window.WindowStyle = 'None'
-$window.AllowsTransparency = $true
-$window.Background = 'Transparent'
-$window.Topmost = $true
-$window.ShowInTaskbar = $false
-$window.ResizeMode = 'NoResize'
-$screen = [System.Windows.SystemParameters]::WorkArea
-$window.Left = $screen.Left
-$window.Top = $screen.Top
-$window.Width = $screen.Width
-$window.Height = $screen.Height
-$canvas = New-Object System.Windows.Controls.Canvas
-$canvas.Background = 'Transparent'
-$window.Content = $canvas
-$frames = @{}
-$timers = New-Object System.Collections.ArrayList
 
-$window.Add_SourceInitialized({
+$state = Get-Content -Raw -Encoding UTF8 -LiteralPath $StatePath | ConvertFrom-Json
+$app = New-Object System.Windows.Application
+$app.ShutdownMode = 'OnExplicitShutdown'
+$windows = New-Object System.Collections.ArrayList
+$timers = New-Object System.Collections.ArrayList
+$screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+
+function Hide-Pet($id) {
+  if (-not $apiBase -or -not $id) { return }
+  try {
+    Invoke-RestMethod -Method Post -Uri ($apiBase + '/dsh-pamper-7470/pet-display') -ContentType 'application/json' -Body (@{ id = $id; display = 'none' } | ConvertTo-Json) | Out-Null
+  } catch {}
+}
+
+function Reload-Desktop {
+  if (-not $apiBase) { return }
+  try {
+    Invoke-RestMethod -Method Post -Uri ($apiBase + '/dsh-pamper-7470/desktop/start') | Out-Null
+  } catch {}
+}
+
+
+function Place-Window($window, $pet, $aspect) {
   $dpi = [System.Windows.Media.VisualTreeHelper]::GetDpi($window)
-  $window.Width = $window.Width / $dpi.DpiScaleX
-  $window.Height = $window.Height / $dpi.DpiScaleY
-  $window.Left = 0
-  $window.Top = 0
-  $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
-  $handle = $helper.Handle
-  $style = [PamperWin]::GetWindowLong($handle, -20)
-  [PamperWin]::SetWindowLong($handle, -20, $style -bor 0x20 -bor 0x80000) | Out-Null
-})
+  $scaleX = if ($dpi.DpiScaleX -gt 0) { $dpi.DpiScaleX } else { 1.0 }
+  $scaleY = if ($dpi.DpiScaleY -gt 0) { $dpi.DpiScaleY } else { 1.0 }
+  $widthPx = [Math]::Max(120, [Math]::Min([double]$pet.size, 900))
+  $heightPx = [Math]::Round($widthPx * $aspect)
+  $marginX = [double]$pet.marginX
+  $marginY = [double]$pet.marginY
+  $window.Width = $widthPx / $scaleX
+  $window.Height = $heightPx / $scaleY
+  $physLeft = $screen.Left / $scaleX
+  $physTop = $screen.Top / $scaleY
+  $physRight = $screen.Right / $scaleX
+  $physBottom = $screen.Bottom / $scaleY
+  if ($pet.corner -like '*left*') { $leftPx = $physLeft + $marginX } else { $leftPx = $physRight - $marginX - $widthPx }
+  if ($pet.corner -like '*bottom*') { $topPx = $physBottom - $marginY - $heightPx } else { $topPx = $physTop + $marginY }
+  $window.Left = $leftPx / $scaleX
+  $window.Top = $topPx / $scaleY
+  try { Add-Content -LiteralPath (Join-Path $env:DSH_HOME 'pamper/desktop-placement.log') -Value ((Get-Date).ToString('o') + ' ' + $pet.kind + ' screen=' + $screen.Left + ',' + $screen.Top + ',' + $screen.Width + ',' + $screen.Height + ' dpi=' + $dpi.DpiScaleX + ',' + $dpi.DpiScaleY + ' size=' + $widthPx + 'x' + $heightPx + ' margin=' + $marginX + ',' + $marginY + ' leftPx=' + $leftPx + ' topPx=' + $topPx + ' win=' + $window.Left + ',' + $window.Top + ',' + $window.Width + ',' + $window.Height) -Encoding UTF8 } catch {}
+}
 
 foreach ($pet in @($state.pets)) {
   $frameList = @($pet.frames)
   if ($frameList.Count -eq 0) { continue }
-  $width = [Math]::Max(120, [Math]::Min([double]$pet.size, 900))
-  $height = [Math]::Round($width * 9 / 16)
+  $window = New-Object System.Windows.Window
+  $window.Title = 'pamper-desktop-helper'
+  $window.WindowStyle = 'None'
+  $window.AllowsTransparency = $true
+  $window.Background = 'Transparent'
+  $window.Topmost = $true
+  $window.ShowInTaskbar = $false
+  $window.ResizeMode = 'NoResize'
+  $window.Focusable = $true
+  $canvas = New-Object System.Windows.Controls.Canvas
+  $canvas.Background = 'Transparent'
+  $window.Content = $canvas
   $image = New-Object System.Windows.Controls.Image
-  $image.Width = $width
-  $image.Height = $height
   $image.Stretch = 'Uniform'
+  $image.HorizontalAlignment = 'Stretch'
+  $image.VerticalAlignment = 'Stretch'
   [System.Windows.Automation.AutomationProperties]::SetName($image, 'pamper-pet-' + $pet.kind)
-  if ($pet.corner -like '*left*') { [System.Windows.Controls.Canvas]::SetLeft($image, [double]$pet.marginX) }
-  else { [System.Windows.Controls.Canvas]::SetRight($image, [double]$pet.marginX) }
-  if ($pet.corner -like '*bottom*') { [System.Windows.Controls.Canvas]::SetBottom($image, [double]$pet.marginY) }
-  else { [System.Windows.Controls.Canvas]::SetTop($image, [double]$pet.marginY) }
   $canvas.Children.Add($image) | Out-Null
 
-  $frameState = @{ index = 0 }
+  $frameState = @{ index = 0; frames = $frameList }
   $loadFrame = {
     param($i)
     $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
     $bitmap.BeginInit()
-    $bitmap.UriSource = [Uri]$frameList[$i]
+    $bitmap.UriSource = [Uri]$frameState.frames[$i]
     $bitmap.CacheOption = 'OnLoad'
     $bitmap.EndInit()
     $image.Source = $bitmap
     [System.Windows.Automation.AutomationProperties]::SetHelpText($image, [string]$i)
   }
   & $loadFrame 0
+  $aspect = 1.0
+  if ($image.Source -and $image.Source.PixelWidth -gt 0) {
+    $aspect = [double]$image.Source.PixelHeight / [double]$image.Source.PixelWidth
+  }
   $timer = New-Object System.Windows.Threading.DispatcherTimer
   $timer.Interval = [TimeSpan]::FromMilliseconds(83)
   $timer.Add_Tick({
-    $frameState.index = ($frameState.index + 1) % $frameList.Count
+    $frameState.index = ($frameState.index + 1) % $frameState.frames.Count
     & $loadFrame $frameState.index
   }.GetNewClosure())
   $timer.Start()
   $timers.Add($timer) | Out-Null
+
+  $menu = New-Object System.Windows.Controls.ContextMenu
+  $exitItem = New-Object System.Windows.Controls.MenuItem
+  $exitItem.Header = '退出回家'
+  $exitItem.Add_Click({ Hide-Pet $pet.id; $window.Close() }.GetNewClosure())
+  $hideItem = New-Object System.Windows.Controls.MenuItem
+  $hideItem.Header = '隐藏'
+  $hideItem.Add_Click({ Hide-Pet $pet.id; $window.Close() }.GetNewClosure())
+  $reloadItem = New-Object System.Windows.Controls.MenuItem
+  $reloadItem.Header = '重载配置'
+  $reloadItem.Add_Click({ Reload-Desktop; $window.Close() }.GetNewClosure())
+  $menu.Items.Add($exitItem) | Out-Null
+  $menu.Items.Add($hideItem) | Out-Null
+  $menu.Items.Add($reloadItem) | Out-Null
+  $window.ContextMenu = $menu
+  $canvas.ContextMenu = $menu
+  $image.ContextMenu = $menu
+  $window.Add_MouseRightButtonUp({
+    param($sender, $event)
+    $menu.IsOpen = $true
+    $event.Handled = $true
+  }.GetNewClosure())
+  $drag = @{ active = $false; moved = $false; start = $null; left = 0; top = 0 }
+  $window.Add_MouseLeftButtonDown({
+    param($sender, $event)
+    $drag.active = $true
+    $drag.moved = $false
+    $drag.start = [System.Windows.Input.Mouse]::GetPosition($window)
+    $drag.left = $window.Left
+    $drag.top = $window.Top
+    $window.CaptureMouse() | Out-Null
+    $event.Handled = $true
+  }.GetNewClosure())
+  $window.Add_MouseMove({
+    param($sender, $event)
+    if (-not $drag.active) { return }
+    if ([System.Windows.Input.Mouse]::LeftButton -ne [System.Windows.Input.MouseButtonState]::Pressed) { return }
+    $current = [System.Windows.Input.Mouse]::GetPosition($window)
+    $dx = [Math]::Abs($current.X - $drag.start.X)
+    $dy = [Math]::Abs($current.Y - $drag.start.Y)
+    if ($dx -gt 4 -or $dy -gt 4) {
+      $drag.moved = $true
+      $window.Left = $drag.left + ($current.X - $drag.start.X)
+      $window.Top = $drag.top + ($current.Y - $drag.start.Y)
+    }
+  }.GetNewClosure())
+  $window.Add_MouseLeftButtonUp({
+    param($sender, $event)
+    $drag.active = $false
+    $window.ReleaseMouseCapture()
+    if (-not $drag.moved) {
+      $transform = New-Object System.Windows.Media.ScaleTransform 1.0, 1.0
+      $image.RenderTransform = $transform
+      $image.RenderTransformOrigin = New-Object System.Windows.Point 0.5, 0.5
+      $animation = New-Object System.Windows.Media.Animation.DoubleAnimation
+      $animation.From = 1.0
+      $animation.To = 0.9
+      $animation.Duration = [System.Windows.Duration]::FromMilliseconds(100)
+      $animation.AutoReverse = $true
+      $transform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleXProperty, $animation)
+      $transform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleYProperty, $animation)
+    }
+    $event.Handled = $true
+  }.GetNewClosure())
+
+  $windows.Add($window) | Out-Null
+  $window.Show() | Out-Null
+  Place-Window $window $pet $aspect
+  $image.Width = $window.Width
+  $image.Height = $window.Height
+  $image.Stretch = 'Uniform'
+  $window.Topmost = $false
+  $window.Topmost = $true
+  try { $window.Activate() | Out-Null } catch {}
+  $interop = New-Object System.Windows.Interop.WindowInteropHelper($window)
+  $handle = $interop.Handle
+  try { [PamperTop]::SetForegroundWindow($handle) | Out-Null } catch {}
+  $topTimer = New-Object System.Windows.Threading.DispatcherTimer
+  $topTimer.Interval = [TimeSpan]::FromMilliseconds(200)
+  $topTimer.Add_Tick({ $window.Topmost = $true; [PamperTop]::SetWindowPos($handle, [IntPtr](-1), 0, 0, 0, 0, 0x0013) | Out-Null }.GetNewClosure())
+  $topTimer.Start()
+  $timers.Add($topTimer) | Out-Null
 }
 
-$window.ShowDialog() | Out-Null
+[System.Windows.Threading.Dispatcher]::Run() | Out-Null
+
+

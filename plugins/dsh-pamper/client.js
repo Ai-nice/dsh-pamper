@@ -5656,12 +5656,12 @@ function createLoveEntry({ h: h2, useEffect, useRef, PetConfigSection, ROUTE_PAT
         const overlay = document.createElement("div");
         overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;";
         const panel = document.createElement("div");
-        panel.style.cssText = "background:#fff;border-radius:18px;box-shadow:0 30px 80px rgba(15,23,42,.35);width:min(560px,92vw);overflow:hidden;";
+        panel.style.cssText = "width:min(820px,100%);max-height:90vh;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(15,23,42,.3);display:flex;flex-direction:column;";
         const head2 = document.createElement("div");
-        head2.style.cssText = "display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid rgba(15,35,80,.10);";
+        head2.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;border-bottom:1px solid rgba(15,35,80,.08);";
         const title2 = document.createElement("div");
-        title2.style.cssText = "flex:1 1 auto;font-size:15px;font-weight:700;color:#16233d;";
-        title2.textContent = action.name + " \xB7 " + action.category;
+        title2.textContent = action.name + (action.category ? " \xB7 " + action.category : "");
+        title2.style.cssText = "font-size:15px;font-weight:700;color:#16233d;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
         const close = document.createElement("button");
         close.type = "button";
         close.textContent = "\u5173\u95ED";
@@ -5669,54 +5669,46 @@ function createLoveEntry({ h: h2, useEffect, useRef, PetConfigSection, ROUTE_PAT
         head2.appendChild(title2);
         head2.appendChild(close);
         const stage = document.createElement("div");
-        stage.style.cssText = "position:relative;width:100%;aspect-ratio:16/9;background:#F2F5FA;display:flex;align-items:center;justify-content:center;";
+        stage.style.cssText = "position:relative;width:100%;aspect-ratio:16/9;background:#F2F5FA;display:flex;align-items:center;justify-content:center;overflow:hidden;";
         const hint = document.createElement("div");
-        hint.textContent = "\u6B63\u5728\u8F7D\u5165\u7CBE\u7075\u56FE\u2026";
+        hint.textContent = "\u6B63\u5728\u52A0\u8F7D\u9884\u89C8\u2026";
         hint.style.cssText = "font-size:13px;color:#8a94a8;";
-        const frame = document.createElement("div");
-        frame.style.cssText = "display:none;width:100%;height:100%;background-repeat:no-repeat;background-position:0 0;";
+        const video = document.createElement("video");
+        video.autoplay = true;
+        video.loop = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.style.cssText = "display:none;width:100%;height:100%;object-fit:contain;";
         stage.appendChild(hint);
-        stage.appendChild(frame);
+        stage.appendChild(video);
         panel.appendChild(head2);
         panel.appendChild(stage);
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
-        let raf = 0;
-        let img = null;
         const cleanup = () => {
-          cancelAnimationFrame(raf);
+          try {
+            video.pause();
+            video.removeAttribute("src");
+            video.load();
+          } catch (e) {
+            void e;
+          }
           overlay.remove();
         };
         close.onclick = cleanup;
         overlay.addEventListener("click", (event) => {
           if (event.target === overlay) cleanup();
         });
-        img = new Image();
-        img.onload = () => {
+        video.onloadeddata = () => {
           hint.remove();
-          frame.style.display = "block";
-          const width = stage.clientWidth || 480;
-          const height = stage.clientHeight || 270;
-          const cols = Math.max(1, Number(action.columns) || 1);
-          const rows = Math.max(1, Number(action.rows) || 1);
-          const total = Math.max(1, Number(action.frameCount) || 1);
-          const fps = Math.max(1, Number(action.fps) || 12);
-          frame.style.backgroundImage = "url(" + img.src + ")";
-          frame.style.backgroundSize = width * cols + "px " + height * rows + "px";
-          const started = performance.now();
-          const tick = (now) => {
-            const index = Math.floor((now - started) / 1e3 * fps) % total;
-            const col = index % cols;
-            const row = Math.floor(index / cols);
-            frame.style.backgroundPosition = -col * width + "px " + -row * height + "px";
-            raf = requestAnimationFrame(tick);
-          };
-          raf = requestAnimationFrame(tick);
+          video.style.display = "block";
+          void video.play().catch(() => {
+          });
         };
-        img.onerror = () => {
-          hint.textContent = "\u9884\u89C8\u8F7D\u5165\u5931\u8D25";
+        video.onerror = () => {
+          hint.textContent = "\u9884\u89C8\u52A0\u8F7D\u5931\u8D25";
         };
-        img.src = STORE_ROUTE + "/thumb?pack=" + encodeURIComponent(action.pack) + "&name=" + encodeURIComponent(action.name);
+        video.src = STORE_ROUTE + "/preview?pack=" + encodeURIComponent(action.pack) + "&name=" + encodeURIComponent(action.name);
       };
       const renderDiscovery = () => {
         try {
@@ -6012,7 +6004,20 @@ function createLoveEntry({ h: h2, useEffect, useRef, PetConfigSection, ROUTE_PAT
       paintTabs();
       paintStats();
       void loadGallery();
+      let refreshing = false;
+      const refreshTimer = setInterval(async () => {
+        if (activeTab !== "characters" || refreshing) return;
+        refreshing = true;
+        try {
+          await loadGallery();
+        } catch (e) {
+          void e;
+        } finally {
+          refreshing = false;
+        }
+      }, 2500);
       return () => {
+        clearInterval(refreshTimer);
         if (rootRef.current) {
           try {
             rootRef.current.unmount();

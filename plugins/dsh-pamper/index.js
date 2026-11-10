@@ -277,6 +277,7 @@ async function listPacks() {
       }
       packs.push({
         kind,
+        id: pet?.id,
         name: pet?.name || kind,
         group: GROUP_OF(kind),
         avatar,
@@ -383,16 +384,17 @@ export function apply(ctx) {
     for (const item of pets) {
       try {
         const frames = await ensureFrames(ctx, item.kind, item.idle);
-        state.pets.push({ kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner, marginX: item.marginX, marginY: item.marginY, frames });
+        state.pets.push({ id: item.id, kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner, marginX: item.marginX, marginY: item.marginY, frames });
       } catch (error) {
         ctx.logger?.warn?.('[dsh-pamper] 桌面模式准备失败 ' + item.kind + '：' + (error instanceof Error ? error.message : String(error)));
       }
     }
     return state;
   };
-  const launchDesktop = async () => {
+  const launchDesktop = async (apiBase = '') => {
     stopDesktop();
     const state = await buildDesktopState();
+    if (apiBase) state.apiBase = apiBase;
     if (state.pets.length === 0) return state;
     const stateFile = join(ownRoot(), 'desktop-state.json');
     await writeJson(stateFile, state);
@@ -420,6 +422,22 @@ export function apply(ctx) {
         await ensureBaseInstalled(ctx);
         const entries = await readdir(petsDir()).catch(() => []);
         return sendJson(res, 200, { ok: true, characters: entries.filter((name) => name.endsWith('-config.json')).length });
+      }
+      if (req.method === 'GET' && path === 'preview') {
+        const pack = url.searchParams.get('pack') || '';
+        const name = url.searchParams.get('name') || '';
+        const catalog = await loadCatalog();
+        const action = catalog.characters.flatMap((character) => character.actions).find((item) => item.pack === pack && item.name === name);
+        if (!action) return sendText(res, 404, 'not found');
+        try {
+          const file = await downloadAction(ctx, action);
+          res.statusCode = 200;
+          res.setHeader('content-type', 'video/webm');
+          res.setHeader('cache-control', 'public, max-age=3600');
+          return res.end(await readFile(file));
+        } catch (error) {
+          return sendText(res, 500, error instanceof Error ? error.message : String(error));
+        }
       }
       if (req.method === 'GET' && path === 'thumb') {
         const pack = url.searchParams.get('pack') || '';
@@ -465,6 +483,24 @@ export function apply(ctx) {
         await refreshDesktopIfRunning();
         return sendJson(res, 200, await readConfigMap());
       }
+      if (req.method === 'POST' && path === 'pet-position') {
+        const body = await readBody(req);
+        const id = String(body.id || '');
+        const merged = await readConfigMap();
+        let changed = false;
+        for (const config of Object.values(merged)) {
+          for (const pet of Array.isArray(config.pets) ? config.pets : []) {
+            if (pet.id !== id) continue;
+            pet.position = pet.position || {};
+            if (typeof body.corner === 'string') pet.position.corner = body.corner;
+            if (Number.isFinite(Number(body.marginX))) pet.position.marginX = Number(body.marginX);
+            if (Number.isFinite(Number(body.marginY))) pet.position.marginY = Number(body.marginY);
+            changed = true;
+          }
+        }
+        if (changed) await writeConfigMap(merged);
+        return sendJson(res, 200, { ok: true });
+      }
       if (req.method === 'POST' && path === 'pet-display') {
         const body = await readBody(req);
         const id = String(body.id || '');
@@ -478,7 +514,7 @@ export function apply(ctx) {
         }
         if (changed) await writeConfigMap(merged);
         try {
-          if (display === 'desktop' && (!desktopChild || desktopChild.exitCode !== null)) await launchDesktop();
+          if (display === 'desktop' && (!desktopChild || desktopChild.exitCode !== null)) await launchDesktop('http://' + (req.headers.host || '127.0.0.1'));
           else await refreshDesktopIfRunning();
         } catch (error) {
           ctx.logger?.warn?.('[dsh-pamper] 桌面模式启动失败：' + (error instanceof Error ? error.message : String(error)));
@@ -615,7 +651,7 @@ export function apply(ctx) {
         return sendJson(res, 200, { ok: true, running: false });
       }
       if (req.method === 'POST' && path === 'desktop/start') {
-        const state = await launchDesktop();
+        const state = await launchDesktop('http://' + (req.headers.host || '127.0.0.1'));
         if (state.pets.length === 0) return sendJson(res, 500, { ok: false, error: '没有可转换的桌面动画（需要 ffmpeg）' });
         return sendJson(res, 200, { ok: true, running: true, pid: desktopChild?.pid || null, count: state.pets.length });
       }
