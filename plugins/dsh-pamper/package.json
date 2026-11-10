@@ -1,6 +1,6 @@
 {
   "name": "dsh-pamper",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "独立桌宠插件：宠爱页面 + 页面内宠物显示，动作按需从 CDN 下载（不依赖 dsh-pet）。",
   "exports": {

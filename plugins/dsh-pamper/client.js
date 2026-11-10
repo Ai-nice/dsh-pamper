@@ -128,8 +128,8 @@ window.__ModuleLoader__.load({
         h('div', { style: { maxWidth: '1180px', margin: '0 auto' } },
           h('div', { style: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' } },
             h('div', null,
-              h('div', { style: { fontSize: '22px', fontWeight: 700, color: '#16233d' } }, '宠爱'),
-              h('div', { style: { fontSize: '13px', color: '#5b6b8a', marginTop: '2px' } }, '独立桌宠：动作按需下载，无需 dsh-pet')
+              h('div', { style: { fontSize: '22px', fontWeight: 700, color: '#16233d' } }, 'Pamper'),
+              h('div', { style: { fontSize: '13px', color: '#5b6b8a', marginTop: '2px' } }, '独立版桌宠：不依赖 dsh-pet；页面内浮层 + 动作按需下载')
             ),
             h('button', { type: 'button', onClick: () => void refresh(), style: { border: '1px solid rgba(15,35,80,.16)', background: '#fff', borderRadius: '10px', padding: '8px 14px', cursor: 'pointer', color: '#3b4a66' } }, '刷新')
           ),
@@ -211,7 +211,7 @@ window.__ModuleLoader__.load({
       inject: ['slots'],
       apply(ctx) {
         ctx.slots.inject('sidebar.panellist', function* () {
-          yield ctx.slots.register({ name: 'sidebar.panellist', id: 'pamper', order: 4, label: () => '宠爱' }, LoveIcon);
+          yield ctx.slots.register({ name: 'sidebar.panellist', id: 'pamper', order: 4, label: () => 'Pamper' }, LoveIcon);
         });
         ctx.slots.inject('main', function* () {
           yield ctx.slots.register({ name: 'main', key: 'pamper' }, Panel);

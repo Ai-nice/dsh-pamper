@@ -85,7 +85,7 @@ function defaultState() {
   };
 
 export function apply(ctx) {
-  cleanupLegacyDshPetPatch(ctx);
+  // 独立版与旧版宠爱页面共存：不再自动回滚 dsh-pet 补丁。
   let catalogPromise = null;
   const loadCatalog = async () => {
     if (!catalogPromise) catalogPromise = readFile(CATALOG_PATH, 'utf8').then(JSON.parse);
