@@ -20,12 +20,12 @@
         "en": "Browse 819 desktop-pet actions and load them on demand.",
         "zh": "浏览 819 个桌宠动作，按需下载加载。"
       },
-      "icon": "https://raw.githubusercontent.com/Ai-nice/dsh-pamper/main/plugin/dsh-pamper/icon.svg",
+      "icon": "https://raw.githubusercontent.com/Ai-nice/dsh-pamper/main/plugins/dsh-pamper/icon.svg",
       "author": "Ai-nice",
       "homepage": "https://github.com/Ai-nice/dsh-pamper",
       "repository": {
         "url": "https://github.com/Ai-nice/dsh-pamper",
-        "directory": "plugin/dsh-pamper"
+        "directory": "plugins/dsh-pamper"
       },
       "metadata": {
         "keywords": [
@@ -43,7 +43,7 @@
             "type": "git",
             "url": "https://github.com/Ai-nice/dsh-pamper",
             "commit": "8ae4e772915328e0a4c4e065fcb7d129ccc0b386",
-            "path": "plugin/dsh-pamper"
+            "path": "plugins/dsh-pamper"
           },
           "engines": {
             "dsh": ">=0.2.0"

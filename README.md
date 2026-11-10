@@ -29,7 +29,7 @@ https://raw.githubusercontent.com/Ai-nice/dsh-pamper/main/market-index.json
 1. 打开 DSH 侧栏 **插件**；
 2. 若没有「发现」标签页：在实验性插件中启用 **自定义插件索引**（`@deepseek-ai/dsh-experimental-plugin-market-bundle`）；
 3. **发现 → 添加索引源**，粘贴上面的 URL；
-4. 搜索 **pamper**，点安装（包名 `dsh-pamper`，来自 GitHub 仓库 `plugin/dsh-pamper`）。
+4. 搜索 **pamper**，点安装（包名 `dsh-pamper`，来自 GitHub 仓库 `plugins/dsh-pamper`）。
 
 > 安装的是动作库插件（发现页动作按需加载的后端）。宠爱页面的 UI 补丁仍由项目里的 `scripts/patch-dsh-pet.mjs` 提供；基础形象包在 Release 的 `pets-base.zip`。
 
@@ -49,7 +49,7 @@ https://raw.githubusercontent.com/Ai-nice/dsh-pamper/main/market-index.json
 git clone https://github.com/Ai-nice/dsh-pamper.git
 cd pamper
 node scripts/install-lite.mjs   # 自动从 Release 下载 pets-base.zip 并安装
-# 再在 DSH 里安装 plugin/dsh-pamper（一次）
+# 再在 DSH 里安装 plugins/dsh-pamper（一次）
 ```
 
 之后打开 **宠爱 → 发现**，点动作「加载」时插件会从 `assetBaseUrl` 下载对应 WebM 到本地缓存再安装，**不需要 ffmpeg、不需要下载整个素材库**。
@@ -101,14 +101,14 @@ node scripts/patch-dsh-pet.mjs --revert   # 还原（含 main-config 与包内 c
 
 ### 插件安装
 
-发现页的后端是项目内的小型 DSH host 插件 `plugin/dsh-pamper/`（注册 `/dsh-pamper-7462/*` 路由）。安装一次即可：
+发现页的后端是项目内的小型 DSH host 插件 `plugins/dsh-pamper/`（注册 `/dsh-pamper-7462/*` 路由）。安装一次即可：
 
 ```powershell
 # 在 DSH 里通过 plugin_manager install_bundle 安装（target 用绝对路径）
 # C:\...\pamper\plugin\dsh-pamper
 ```
 
-插件读取的路径写在 `plugin/dsh-pamper/cordis.patch.yml`：`storeRoot`（动作库）与 `catalogPath`（发现页目录），项目移动后改这两个路径并重装插件即可。
+插件读取的路径写在 `plugins/dsh-pamper/cordis.patch.yml`：`storeRoot`（动作库）与 `catalogPath`（发现页目录），项目移动后改这两个路径并重装插件即可。
 
 ![发现页](<D:\PC\DSH\pamper\preview\discovery-shot.png>)
 ## 目录
@@ -337,14 +337,14 @@ node scripts/serve.mjs
 
 ### 插件安装
 
-发现页的后端是项目内的小型 DSH host 插件 `plugin/dsh-pamper/`（注册 `/dsh-pamper-7462/*` 路由）。安装一次即可：
+发现页的后端是项目内的小型 DSH host 插件 `plugins/dsh-pamper/`（注册 `/dsh-pamper-7462/*` 路由）。安装一次即可：
 
 ```powershell
 # 在 DSH 里通过 plugin_manager install_bundle 安装（target 用绝对路径）
 # C:\...\pamper\plugin\dsh-pamper
 ```
 
-插件读取的路径写在 `plugin/dsh-pamper/cordis.patch.yml`：`storeRoot`（动作库）与 `catalogPath`（发现页目录），项目移动后改这两个路径并重装插件即可。
+插件读取的路径写在 `plugins/dsh-pamper/cordis.patch.yml`：`storeRoot`（动作库）与 `catalogPath`（发现页目录），项目移动后改这两个路径并重装插件即可。
 
 ![发现页](<D:\PC\DSH\pamper\preview\discovery-shot.png>)
 ## 目录结构

@@ -59,7 +59,7 @@ node scripts/pack-release.mjs
    ```json
    { "basePackUrl": "<pets-base.zip 的 Release 下载直链>", "assetsBaseUrl": "https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main" }
    ```
-2. `plugin/dsh-pamper/cordis.patch.yml`：
+2. `plugins/dsh-pamper/cordis.patch.yml`：
    ```yaml
    assetBaseUrl: 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main'
    ```
@@ -74,7 +74,7 @@ cd pamper
 # 2. 下载 8 个基础形象并安装（自动读 release-config.json 的 basePackUrl）
 node scripts/install-lite.mjs
 # 3. 安装插件（DSH Host 侧，一次）
-#    在 DSH 里用 plugin_manager install_bundle，target 选本目录 plugin/dsh-pamper
+#    在 DSH 里用 plugin_manager install_bundle，target 选本目录 plugins/dsh-pamper
 # 4. 打开 DSH → 宠爱 → 发现；点动作「加载」时插件自动从 assetsBaseUrl 下载对应 WebM 并缓存
 ```
 
