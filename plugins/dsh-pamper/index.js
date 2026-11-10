@@ -1,47 +1,53 @@
 /**
- * dsh-pamper：完全独立的桌宠插件。
+ * dsh-action-store：桌面宠物动作库（按需加载）。
  *
- * 不读取、不修改 dsh-pet 的任何文件；自己的数据放在 %DSH_HOME%/pamper。
- * 基础动作从 jsDelivr 按需下载（预转换透明 WebM），无需 ffmpeg。
+ * 负责三件事：
+ *  1. 读取项目里的完整动作目录（catalog/action-store.json）与精灵图，给「宠爱 → 发现」页用；
+ *  2. 按需把精灵图转成 dsh-pet 可播放的透明 WebM，并合并进对应形象的 config；
+ *  3. 卸载动作（移除配置引用 + 删除 WebM），最后通知 dsh-pet 重载配置。
  */
+import { spawn, spawnSync } from 'node:child_process';
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROUTE = '/dsh-pamper-7463';
-const CATALOG_PATH = fileURLToPath(new URL('./catalog/action-store.json', import.meta.url));
-const CHARACTERS = [
-  { key: 'maid', name: '大肥鱼' },
-  { key: 'gpt', name: '白龙娘' },
-  { key: 'claude', name: '橙发书娘' },
-  { key: 'gemini', name: '紫发猫耳娘' }
-];
-const ASSET_BASE = 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main';
-const PACKS_OF = { maid: ['dsh', 'dsh1'], gpt: ['gpt', 'gpt1'], claude: ['claude'], gemini: ['gemini'] };
-const characterKeyOfPack = (pack) => Object.entries(PACKS_OF).find(([, packs]) => packs.includes(pack))?.[0] || pack;
+const ROUTE_SEGMENT = '/dsh-action-store-7462';
+const DSH_PET_ROUTE = '/dsh-pet-7340';
+
+const TARGETS = {
+  maid: { kind: 'main', name: '大肥鱼', storePack: 'dsh' },
+  gpt: { kind: 'aboutme-dragon', name: '白龙娘' },
+  claude: { kind: 'aboutme-claude', name: '橙发书娘' },
+  gemini: { kind: 'aboutme-gemini', name: '紫发猫耳娘' }
+};
 
 export const name = 'dsh-pamper';
 export const inject = ['webServer'];
 
-const dshHome = () => process.env.DSH_HOME || join(homedir(), '.dsh');
-const dataRoot = () => join(dshHome(), 'pamper');
-const statePath = () => join(dataRoot(), 'state.json');
+const DEFAULT_ASSET_BASE_URL = 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main';
+
+function resolveDshPetRoot() {
+  const home = process.env.DSH_HOME || join(homedir(), '.dsh');
+  return join(home, 'dsh-pet');
+}
 
 function sendJson(res, status, body) {
+  const text = JSON.stringify(body);
   res.statusCode = status;
   res.setHeader('content-type', 'application/json; charset=utf-8');
   res.setHeader('cache-control', 'no-store');
-  res.end(JSON.stringify(body));
-}
-function sendText(res, status, text) {
-  res.statusCode = status;
-  res.setHeader('content-type', 'text/plain; charset=utf-8');
   res.end(text);
 }
+
+function sendText(res, status, text, contentType = 'text/plain; charset=utf-8') {
+  res.statusCode = status;
+  res.setHeader('content-type', contentType);
+  res.setHeader('cache-control', 'no-store');
+  res.end(text);
+}
+
 async function readBody(req, limit = 2 * 1024 * 1024) {
   const chunks = [];
   let size = 0;
@@ -53,205 +59,419 @@ async function readBody(req, limit = 2 * 1024 * 1024) {
   const text = Buffer.concat(chunks).toString('utf8');
   return text ? JSON.parse(text) : {};
 }
+
 async function isFile(path) {
   try {
-    return (await stat(path)).isFile();
+    const info = await stat(path);
+    return info.isFile();
   } catch {
     return false;
   }
 }
-function defaultState() {
-  const characters = {};
-  for (const character of CHARACTERS) characters[character.key] = { visible: character.key === 'maid', loaded: [] };
-  return { schemaVersion: 1, characters };
+
+function ffmpegArgs({ webpPath, outPath, action, withAlphaMode }) {
+  const frameWidth = Number(action.frameWidth);
+  const frameHeight = Number(action.frameHeight);
+  const columns = Number(action.columns);
+  const frameCount = Number(action.frameCount);
+  const fps = Number(action.fps) || 12;
+  if (!(frameWidth > 0 && frameHeight > 0 && columns > 0 && frameCount > 0)) {
+    throw new Error('精灵图元数据非法：' + action.name);
+  }
+  const vf = `crop=${frameWidth}:${frameHeight}:x='mod(n\\,${columns})*${frameWidth}':y='floor(n/${columns})*${frameHeight}',format=yuva420p`;
+  const args = [
+    '-hide_banner', '-nostdin', '-y', '-v', 'error',
+    '-loop', '1', '-framerate', String(fps), '-i', webpPath,
+    '-frames:v', String(frameCount), '-vf', vf, '-fps_mode', 'passthrough',
+    '-c:v', 'libvpx-vp9', '-auto-alt-ref', '0', '-pix_fmt', 'yuva420p', '-row-mt', '1',
+    '-b:v', '0', '-crf', '20'
+  ];
+  if (withAlphaMode) args.push('-alpha_mode', '1');
+  args.push('-metadata:s:v:0', 'alpha_mode=1', outPath);
+  return args;
 }
 
-  // 独立版：只清理旧版本（<=0.1.1）给 dsh-pet 打过的补丁，恢复 dsh-pet 原状；不再修改它。
-  const cleanupLegacyDshPetPatch = (ctx) => {
-    try {
-      const profileDir = process.env.DSH_PROFILE_DIR || '';
-      const dshPetDir = profileDir ? join(profileDir, 'node_modules', 'dsh-pet') : '';
-      if (!dshPetDir) return;
-      const clientFile = join(dshPetDir, 'lib', 'client.js');
-      if (!existsSync(clientFile)) return;
-      const source = readFileSync(clientFile, 'utf8');
-      if (!source.includes('pet-love')) return;
-      const script = fileURLToPath(new URL('./cleanup/patch-dsh-pet.mjs', import.meta.url));
-      const result = spawnSync(process.execPath, [script, '--package=' + dshPetDir, '--revert'], { stdio: 'ignore', windowsHide: true });
-      ctx.logger?.info?.('[dsh-pamper] 已清理旧版 dsh-pet 补丁：' + (result.status === 0 ? '成功（刷新页面后旧宠爱菜单消失）' : '失败'));
-    } catch (error) {
-      ctx.logger?.warn?.('[dsh-pamper] 清理旧 dsh-pet 补丁失败：' + (error instanceof Error ? error.message : String(error)));
+async function runFfmpeg(args) {
+  return await new Promise((resolvePromise) => {
+    const child = spawn('ffmpeg', args, { stdio: 'ignore', windowsHide: true });
+    child.on('error', (error) => resolvePromise({ ok: false, error: String(error) }));
+    child.on('close', (code) => resolvePromise({ ok: code === 0, code }));
+  });
+}
+
+async function convertAction({ storeRoot, action, animationDir }) {
+  const webpPath = join(storeRoot, action.spritesheet);
+  if (!(await isFile(webpPath))) throw new Error('缺少精灵图：' + action.spritesheet);
+  const outPath = join(animationDir, action.name + '.webm');
+  if (await isFile(outPath)) return { ok: true, skipped: true, outPath };
+  await mkdir(animationDir, { recursive: true });
+  let result = await runFfmpeg(ffmpegArgs({ webpPath, outPath, action, withAlphaMode: true }));
+  if (!result.ok) result = await runFfmpeg(ffmpegArgs({ webpPath, outPath, action, withAlphaMode: false }));
+  if (!result.ok) throw new Error('ffmpeg 转换失败：' + action.name);
+  if (!(await isFile(outPath))) throw new Error('ffmpeg 没有产出文件：' + action.name);
+  return { ok: true, outPath };
+}
+
+function dedupe(list) {
+  const seen = new Set();
+  return list.filter((name) => {
+    if (!name || seen.has(name)) return false;
+    seen.add(name);
+    return true;
+  });
+}
+
+function appendActions(config, actions) {
+  config.animations = config.animations || {};
+  if (!Array.isArray(config.animations.categories)) config.animations.categories = [];
+  for (const action of actions) {
+    let category = config.animations.categories.find((item) => item.id === action.category);
+    if (!category) {
+      category = { id: action.category || '其他', weight: 9, actions: [] };
+      config.animations.categories.push(category);
     }
-  };
+    if (!Array.isArray(category.actions)) category.actions = [];
+    if (!category.actions.includes(action.name)) category.actions.push(action.name);
+  }
+}
 
-export function apply(ctx) {
-  // 独立版与旧版宠爱页面共存：不再自动回滚 dsh-pet 补丁。
-  let catalogPromise = null;
-  const loadCatalog = async () => {
-    if (!catalogPromise) catalogPromise = readFile(CATALOG_PATH, 'utf8').then(JSON.parse);
-    return await catalogPromise;
-  };
-  const characterOf = (catalog, key) => catalog.characters.find((item) => item.key === key);
-  const packDir = (key) => join(dataRoot(), 'packs', key);
-  const webmPath = (key, actionName) => join(packDir(key), actionName + '.webm');
+function removeActions(config, names) {
+  const drop = new Set(names);
+  const strip = (list) => Array.isArray(list) ? list.filter((name) => !drop.has(name)) : list;
+  const animations = config.animations || {};
+  for (const key of ['idle', 'turn', 'drag', 'clicks']) animations[key] = strip(animations[key]);
+  if (animations.moves?.actions) animations.moves.actions = animations.moves.actions.filter((item) => !drop.has(item?.name));
+  for (const category of Array.isArray(animations.categories) ? animations.categories : []) category.actions = strip(category.actions);
+  for (const key of Object.keys(animations.events || {})) animations.events[key] = strip(animations.events[key]);
+}
 
-  const loadState = async () => {
+function minimalMaidConfig(baseAction) {
+  return {
+    whisperPrompt: '你是主人桌面上的Q版蓝发小女仆，温柔乖巧带点俏皮。每次只说短短一句（20字以内），说话自然随意，不要解释你自己，不要提你是AI。',
+    workStatusTexts: [
+      ['正在想呢……', '让女仆理一下思路'],
+      ['在动手了哦', '这一步交给我吧'],
+      ['这一步处理好了'],
+      ['需要你看一下呢', '等你确认一下~'],
+      ['这轮完成啦'],
+      ['好像卡住了，再试一次']
+    ],
+    memes: {},
+    pets: [{
+      id: 'aboutme-maid-1',
+      name: '蓝毛小女仆',
+      size: 420,
+      balanceEnabled: false,
+      whisperEnabled: true,
+      workStatusEnabled: true,
+      fixedEnabled: true,
+      display: 'none',
+      position: { corner: 'bottom-left', marginX: 24, marginY: 100 }
+    }],
+    animations: {
+      idle: [baseAction],
+      turn: [],
+      drag: [],
+      clicks: [],
+      moves: { default: { minDist: 60, maxDist: 240, margin: 20, leadSec: 2, tailSec: 2 }, actions: [] },
+      categories: [],
+      events: { balance: [baseAction], workStatus: [baseAction], whisper: [baseAction] }
+    },
+    animationWeights: { idle: 10, turn: 5, move: 5 }
+  };
+}
+
+export function apply(ctx, config = {}) {
+  const storeRoot = config.storeRoot || '';
+  const catalogPath = config.catalogPath || fileURLToPath(new URL('./catalog/action-store.json', import.meta.url));
+  const assetBaseUrl = String(config.assetBaseUrl || DEFAULT_ASSET_BASE_URL).replace(/\/+$/, '');
+  const cacheRoot = String(config.cacheRoot || '').trim() || join(resolveDshPetRoot(), 'action-cache');
+  const dshPetRoot = resolveDshPetRoot();
+  const statePath = join(dshPetRoot, 'action-store-state.json');
+
+  const loadCatalog = async () => JSON.parse(await readFile(catalogPath, 'utf8'));
+
+  const readState = async () => {
     try {
-      const state = JSON.parse(await readFile(statePath(), 'utf8'));
-      state.characters = state.characters || {};
-      for (const character of CHARACTERS) {
-        if (!state.characters[character.key]) state.characters[character.key] = { visible: character.key === 'maid', loaded: [] };
-        if (!Array.isArray(state.characters[character.key].loaded)) state.characters[character.key].loaded = [];
-      }
-      return state;
+      return JSON.parse(await readFile(statePath, 'utf8'));
     } catch {
-      return defaultState();
+      return {};
     }
   };
-  const saveState = async (state) => {
-    await mkdir(dataRoot(), { recursive: true });
-    await writeFile(statePath(), JSON.stringify(state, null, 2) + '\n');
+  const writeState = async (state) => {
+    await mkdir(dshPetRoot, { recursive: true });
+    await writeFile(statePath, JSON.stringify(state, null, 2));
   };
 
-  const findAction = (catalog, characterKey, actionName) => {
-    const character = characterOf(catalog, characterKey);
-    return character?.actions.find((action) => action.name === actionName);
-  };
-  const pickBaseAction = (catalog, characterKey) => {
-    const character = characterOf(catalog, characterKey);
-    if (!character || character.actions.length === 0) return null;
-    return character.actions.find((action) => action.category === '待机') || character.actions[0];
-  };
+  const assetsDir = process.env.DSH_PROFILE_DIR
+    ? join(process.env.DSH_PROFILE_DIR, 'node_modules', 'dsh-pet', 'assets')
+    : join(homedir(), '.dsh', 'profiles', process.env.DSH_PROFILE || 'desktop', 'node_modules', 'dsh-pet', 'assets');
 
-  const downloadAction = async (action) => {
-    if (!action?.webm) throw new Error('动作缺少 webm 路径');
-    const target = webmPath(characterKeyOfPack(action.pack), action.name);
-    if (await isFile(target)) return target;
-    const url = ASSET_BASE + '/' + String(action.webm).split('/').map(encodeURIComponent).join('/');
-    let lastError = null;
-    for (let attempt = 1; attempt <= 5; attempt += 1) {
-      try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(60000) });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        if (buffer.length < 1024) throw new Error('文件过小');
-        await mkdir(join(target, '..'), { recursive: true });
-        await writeFile(target, buffer);
-        return target;
-      } catch (error) {
-        lastError = error;
-        if (attempt < 5) await new Promise((resolveDelay) => setTimeout(resolveDelay, 500 * attempt));
+  const stripJsonComments = (text) => {
+    let out = '';
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < text.length; i += 1) {
+      const ch = text[i];
+      const next = text[i + 1];
+      if (inString) {
+        out += ch;
+        if (escaped) escaped = false;
+        else if (ch === '\\') escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
       }
+      if (ch === '"') { inString = true; out += ch; continue; }
+      if (ch === '/' && next === '/') {
+        while (i < text.length && text[i] !== '\n') i += 1;
+        out += '\n';
+        continue;
+      }
+      if (ch === '/' && next === '*') {
+        i += 2;
+        while (i < text.length - 1 && !(text[i] === '*' && text[i + 1] === '/')) i += 1;
+        i += 1;
+        continue;
+      }
+      out += ch;
     }
-    throw new Error('下载失败：' + (lastError?.message || url));
+    return out;
   };
 
-  const ensureBaseAction = async (catalog, characterKey) => {
-    const base = pickBaseAction(catalog, characterKey);
-    if (!base) return null;
-    await downloadAction({ ...base, pack: base.pack });
-    return base.name;
+  const readBaseMainConfig = async () => JSON.parse(stripJsonComments(await readFile(join(assetsDir, 'config.jsonc'), 'utf8')));
+
+  const configPathOf = (kind) => kind === 'main' ? join(dshPetRoot, 'main-config.jsonc') : join(dshPetRoot, 'pet', kind + '-config.json');
+  const animationDirOf = (kind) => kind === 'main' ? join(dshPetRoot, 'main-animation') : join(dshPetRoot, 'pet', kind + '-animation');
+
+  const readPackConfig = async (kind) => {
+    if (kind === 'main') {
+      const base = await readBaseMainConfig();
+      const userPath = configPathOf('main');
+      const user = (await isFile(userPath)) ? JSON.parse(await readFile(userPath, 'utf8')) : {};
+      const merged = { ...base, ...user };
+      if (!merged.animations) merged.animations = base.animations;
+      return merged;
+    }
+    const path = configPathOf(kind);
+    if (!(await isFile(path))) return null;
+    return JSON.parse(await readFile(path, 'utf8'));
+  };
+  const writePackConfig = async (kind, packConfig) => {
+    if (kind === 'main') {
+      const userPath = configPathOf('main');
+      const user = (await isFile(userPath)) ? JSON.parse(await readFile(userPath, 'utf8')) : {};
+      user.animations = packConfig.animations;
+      await writeFile(userPath, JSON.stringify(user, null, 2) + '\n');
+      return;
+    }
+    await mkdir(join(dshPetRoot, 'pet'), { recursive: true });
+    await writeFile(configPathOf(kind), JSON.stringify(packConfig, null, 2) + '\n');
+  };
+
+  const installWebmFromRemote = async (action, animationDir) => {
+    if (!assetBaseUrl || !action.webm) return false;
+    const cachePath = join(cacheRoot, 'webm', action.pack, action.name + '.webm');
+    const targetPath = join(animationDir, action.name + '.webm');
+    if (!(await isFile(cachePath))) {
+      const url = assetBaseUrl + '/' + String(action.webm).split('/').map(encodeURIComponent).join('/');
+      let lastError = null;
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        try {
+          const response = await fetch(url, { signal: AbortSignal.timeout(90000) });
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          const buffer = Buffer.from(await response.arrayBuffer());
+          if (buffer.length < 1024) throw new Error('下载内容过小');
+          const { mkdir, writeFile } = await import('node:fs/promises');
+          await mkdir(join(cacheRoot, 'webm', action.pack), { recursive: true });
+          await writeFile(cachePath, buffer);
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+          ctx.logger?.warn?.('[dsh-pamper] 下载失败（第 ' + attempt + '/5 次）：' + (error instanceof Error ? error.message : String(error)));
+          if (attempt < 5) await new Promise((r) => setTimeout(r, 800 * attempt));
+        }
+      }
+      if (lastError) throw new Error('远程动作下载失败：' + lastError.message + '（' + url + '）');
+    }
+    await mkdir(animationDir, { recursive: true });
+    await copyFile(cachePath, targetPath);
+    return true;
+  };
+
+  const ensureMaidPack = async (catalog) => {
+    const target = TARGETS.maid;
+    if (await isFile(configPathOf(target.kind))) return;
+    const character = catalog.characters.find((item) => item.key === 'maid');
+    const actions = character?.actions || [];
+    const base = actions.find((action) => action.category === '待机') || actions[0];
+    if (!base) throw new Error('动作库里没有小女仆的基础待机动作');
+    await convertAction({ storeRoot, action: base, animationDir: animationDirOf(target.kind) });
+    await writePackConfig(target.kind, minimalMaidConfig(base.name));
+    const avatar = join(storeRoot, 'pets', target.storePack, 'avatar.webp');
+    if (await isFile(avatar)) await copyFile(avatar, join(dshPetRoot, 'pet', target.kind + '-avatar.webp'));
+    ctx.logger?.info?.(`[dsh-pamper] 已创建形象包 ${target.kind}`);
+  };
+
+  const reloadPet = async () => {
+    try {
+      const port = typeof ctx.webServer?.port === 'number' ? ctx.webServer.port : 0;
+      const origin = ctx.webServer?.getOrigin?.() || `http://127.0.0.1:${port}`;
+      await fetch(origin + DSH_PET_ROUTE + '/reload', { method: 'POST' });
+      return true;
+    } catch (error) {
+      ctx.logger?.warn?.(`[dsh-pamper] 通知 dsh-pet 重载失败：${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    }
+  };
+
+  const resolveActions = (catalog, characterKey, body) => {
+    const character = catalog.characters.find((item) => item.key === characterKey);
+    if (!character) throw new Error('未知角色：' + characterKey);
+    if (Array.isArray(body.actionIds) && body.actionIds.length > 0) {
+      const set = new Set(body.actionIds);
+      return character.actions.filter((action) => set.has(action.name) || set.has(action.id));
+    }
+    if (typeof body.category === 'string' && body.category) {
+      return character.actions.filter((action) => action.category === body.category);
+    }
+    if (body.all === true) return character.actions.slice();
+    throw new Error('缺少 actionIds / category / all');
   };
 
   const handle = async (req, res) => {
     const url = new URL(req.url || '/', 'http://localhost');
-    const path = decodeURIComponent(url.pathname.slice(ROUTE.length)).replace(/^\/+/, '');
+    const path = decodeURIComponent(url.pathname.slice(ROUTE_SEGMENT.length)).replace(/^\/+/, '');
     try {
       if (req.method === 'GET' && path === 'catalog') {
         const catalog = await loadCatalog();
-        return sendJson(res, 200, catalog);
+        const packsOnDisk = new Set();
+        for (const target of Object.values(TARGETS)) {
+          if (await isFile(configPathOf(target.kind))) packsOnDisk.add(target.kind);
+        }
+        return sendJson(res, 200, { ...catalog, installedPacks: [...packsOnDisk] });
       }
-      if (req.method === 'GET' && path === 'characters') {
+      if (req.method === 'GET' && path === 'status') {
+        const state = await readState();
         const catalog = await loadCatalog();
-        const state = await loadState();
-        const list = [];
-        for (const character of CHARACTERS) {
-          const conf = characterOf(catalog, character.key);
-          const own = state.characters[character.key];
-          if (own.visible && own.loaded.length === 0) {
-            try {
-              const base = await ensureBaseAction(catalog, character.key);
-              if (base) own.loaded.push(base);
-            } catch (error) {
-              ctx.logger?.warn?.('[dsh-pamper] 基础动作下载失败：' + (error instanceof Error ? error.message : String(error)));
-            }
-          }
-          const loaded = own.loaded.slice();
-          list.push({
-            key: character.key,
-            name: character.name,
-            actionCount: conf?.actions.length || 0,
-            visible: Boolean(own.visible),
+        const characters = {};
+        for (const character of catalog.characters) {
+          const target = TARGETS[character.key];
+          const loaded = Array.isArray(state[character.key]?.loaded) ? state[character.key].loaded : [];
+          characters[character.key] = {
+            kind: target?.kind,
+            installed: target ? await isFile(configPathOf(target.kind)) : false,
             loaded,
-            idle: loaded[0] || null,
-            thumb: conf?.actions?.[0]?.thumb || ''
-          });
+            loadedCount: loaded.length,
+            total: character.actionCount
+          };
         }
-        await saveState(state);
-        return sendJson(res, 200, { characters: list, dataRoot: dataRoot() });
+        return sendJson(res, 200, { characters });
       }
-      if (req.method === 'GET' && path === 'asset') {
-        const kind = url.searchParams.get('kind') || '';
-        const actionName = url.searchParams.get('action') || '';
-        const catalog = await loadCatalog();
-        const allowed = PACKS_OF[kind] || [kind];
-        const action = catalog.characters.flatMap((character) => character.actions).find((item) => item.name === actionName && allowed.includes(item.pack));
-        if (!action) return sendText(res, 404, 'action not found');
-        const file = await downloadAction(action);
-        const buffer = await readFile(file);
+      if (req.method === 'GET' && path === 'thumb') {
+        const pack = url.searchParams.get('pack') || '';
+        const actionName = url.searchParams.get('name') || '';
+        if (!/^[a-z0-9_-]+$/i.test(pack) || !actionName || actionName.includes('..') || /[\\/]/.test(actionName)) {
+          return sendText(res, 400, 'bad request');
+        }
+        const file = join(storeRoot, 'pets', pack, 'spritesheet', actionName + '.webp');
+        if (!(await isFile(file))) return sendText(res, 404, 'not found');
         res.statusCode = 200;
-        res.setHeader('content-type', 'video/webm');
-        res.setHeader('cache-control', 'public, max-age=3600');
-        return res.end(buffer);
-      }
-      if (req.method === 'POST' && path === 'toggle') {
-        const body = await readBody(req);
-        const key = String(body.key || '');
-        if (!CHARACTERS.some((item) => item.key === key)) return sendJson(res, 400, { ok: false, error: '未知角色' });
-        const catalog = await loadCatalog();
-        const state = await loadState();
-        const own = state.characters[key];
-        own.visible = Boolean(body.visible);
-        if (own.visible && own.loaded.length === 0) {
-          const base = await ensureBaseAction(catalog, key);
-          if (base) own.loaded.push(base);
-        }
-        await saveState(state);
-        return sendJson(res, 200, { ok: true, visible: own.visible, loaded: own.loaded });
+        res.setHeader('content-type', 'image/webp');
+        res.setHeader('cache-control', 'public, max-age=86400');
+        return res.end(await readFile(file));
       }
       if (req.method === 'POST' && path === 'load') {
         const body = await readBody(req);
-        const key = String(body.key || '');
-        const names = Array.isArray(body.actions) ? body.actions : [];
+        const characterKey = String(body.character || '');
+        const target = TARGETS[characterKey];
+        if (!target) return sendJson(res, 400, { ok: false, error: '未知角色：' + characterKey });
         const catalog = await loadCatalog();
-        const state = await loadState();
-        const own = state.characters[key];
-        if (!own) return sendJson(res, 400, { ok: false, error: '未知角色' });
-        const done = [];
+        const packConfig = await readPackConfig(target.kind);
+        if (!packConfig) return sendJson(res, 400, { ok: false, error: '形象包未安装：' + target.kind });
+        const actions = resolveActions(catalog, characterKey, body);
+        const converted = [];
         const failed = [];
-        for (const name of names) {
-          const action = findAction(catalog, key, name);
-          if (!action) {
-            failed.push(name + '：动作不存在');
-            continue;
-          }
+        let remoteCount = 0;
+        for (const action of actions) {
           try {
-            await downloadAction(action);
-            if (!own.loaded.includes(name)) own.loaded.push(name);
-            done.push(name);
+            let installed = false;
+            try {
+              installed = await installWebmFromRemote(action, animationDirOf(target.kind));
+            } catch (error) {
+              ctx.logger?.warn?.('[dsh-pamper] ' + (error instanceof Error ? error.message : String(error)));
+            }
+            if (!installed) await convertAction({ storeRoot, action, animationDir: animationDirOf(target.kind) });
+            else remoteCount += 1;
+            converted.push(action);
           } catch (error) {
-            failed.push(name + '：' + (error instanceof Error ? error.message : String(error)));
+            failed.push(action.name + '：' + (error instanceof Error ? error.message : String(error)));
           }
         }
-        await saveState(state);
-        return sendJson(res, 200, { ok: true, loaded: done, failed });
+        appendActions(packConfig, converted);
+        await writePackConfig(target.kind, packConfig);
+        const state = await readState();
+        state[characterKey] = state[characterKey] || {};
+        state[characterKey].loaded = dedupe([...(state[characterKey].loaded || []), ...converted.map((action) => action.name)]);
+        await writeState(state);
+        const reloaded = await reloadPet();
+        return sendJson(res, 200, {
+          ok: true,
+          character: characterKey,
+          kind: target.kind,
+          converted: converted.length,
+          remote: remoteCount,
+          failed,
+          reloaded,
+          loadedCount: state[characterKey].loaded.length
+        });
+      }
+      if (req.method === 'POST' && path === 'unload') {
+        const body = await readBody(req);
+        const characterKey = String(body.character || '');
+        const target = TARGETS[characterKey];
+        if (!target) return sendJson(res, 400, { ok: false, error: '未知角色：' + characterKey });
+        const catalog = await loadCatalog();
+        const actions = resolveActions(catalog, characterKey, body);
+        const packConfig = await readPackConfig(target.kind);
+        const names = actions.map((action) => action.name);
+        if (packConfig) {
+          removeActions(packConfig, names);
+          await writePackConfig(target.kind, packConfig);
+        }
+        for (const actionName of names) {
+          await rm(join(animationDirOf(target.kind), actionName + '.webm'), { force: true });
+        }
+        const state = await readState();
+        const keep = new Set((state[characterKey]?.loaded || []).filter((name) => !names.includes(name)));
+        state[characterKey] = { ...(state[characterKey] || {}), loaded: [...keep] };
+        await writeState(state);
+        const reloaded = await reloadPet();
+        return sendJson(res, 200, { ok: true, character: characterKey, removed: names.length, reloaded, loadedCount: keep.size });
       }
       return sendText(res, 404, 'not found');
     } catch (error) {
-      ctx.logger?.warn?.('[dsh-pamper] route failed: ' + (error instanceof Error ? error.message : String(error)));
+      ctx.logger?.warn?.(`[dsh-pamper] route failed: ${error instanceof Error ? error.message : String(error)}`);
       return sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
     }
   };
 
-  ctx.effect(() => ctx.webServer.register({ kind: 'prefix', path: ROUTE, handler: (req, res) => void handle(req, res) }));
+  // 安装/启动时自动给 dsh-pet 打上「宠爱」入口补丁（失败不阻塞插件）。
+  try {
+    const profileDir = process.env.DSH_PROFILE_DIR || '';
+    const dshPetDir = profileDir ? join(profileDir, 'node_modules', 'dsh-pet') : '';
+    if (dshPetDir && existsSync(join(dshPetDir, 'lib', 'client.js'))) {
+      const patcher = fileURLToPath(new URL('./patcher/patch-dsh-pet.mjs', import.meta.url));
+      const result = spawnSync(process.execPath, [patcher, '--package=' + dshPetDir], { stdio: 'ignore', windowsHide: true });
+      ctx.logger?.info?.('[dsh-pamper] dsh-pet「宠爱」入口补丁：' + (result.status === 0 ? '已应用/已存在，刷新页面生效' : '应用失败，请查看日志'));
+    }
+  } catch (error) {
+    ctx.logger?.warn?.('[dsh-pamper] 自动补丁失败：' + (error instanceof Error ? error.message : String(error)));
+  }
+
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'prefix',
+    path: ROUTE_SEGMENT,
+    handler: (req, res) => void handle(req, res)
+  }));
 }

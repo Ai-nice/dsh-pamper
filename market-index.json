@@ -17,8 +17,8 @@
         "zh": "pamper 动作库"
       },
       "description": {
-        "en": "Standalone Pamper desktop pet: 宠爱 page, in-page pet overlay and on-demand action downloads; no dsh-pet needed.",
-        "zh": "独立 pamper 桌宠：宠爱页面、页面内宠物浮层、动作按需下载；不需要 dsh-pet。"
+        "en": "Pamper 宠爱 suite for dsh-pet: patched 宠爱 page (characters / config / discover) with on-demand WebM actions.",
+        "zh": "pamper 宠爱页面套件：给 dsh-pet 打上角色/桌宠配置/发现页补丁，动作按需下载。"
       },
       "icon": "https://raw.githubusercontent.com/Ai-nice/dsh-pamper/main/plugins/dsh-pamper/icon.svg",
       "author": "Ai-nice",
@@ -36,6 +36,16 @@
         "labels": []
       },
       "versions": [
+        {
+          "version": "0.3.0",
+          "publishTimestamp": 1794304588,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        },
         {
           "version": "0.2.1",
           "publishTimestamp": 1794302982,
