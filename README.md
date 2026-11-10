@@ -16,6 +16,18 @@
 
 > **项目最终位置：`D:\PC\DSH\pamper`。** 下文命令均以该项目根目录为当前目录执行。
 
+### 收录到社区插件市场（awesome-dsh-plugin）
+
+已向 `LingHXiao/awesome-dsh-plugin` 提交收录 PR：
+
+- PR：https://github.com/LingHXiao/awesome-dsh-plugin/pull/2
+- 合并后，dsh-market 的「发现」会自动抓取该目录（通常一天内），即可搜索 **Ai-nice/dsh-pamper** 并一键安装。
+
+> 网络无法访问 GitHub raw 时（安装报 TLS/无法连接 raw.githubusercontent.com），请用 jsDelivr 的 tgz 直链安装：
+> ```text
+> https://cdn.jsdelivr.net/gh/Ai-nice/dsh-pamper@main/plugin-tarballs/dsh-pamper.tgz
+> ```
+
 ## DSH 插件市场（自定义索引）
 
 官方目前**没有公共插件索引**；其他插件也是通过「索引源」被发现。添加下面这个索引地址后，就能在插件市场里直接搜索并安装 **pamper**：
