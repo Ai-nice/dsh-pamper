@@ -35,6 +35,14 @@ window.__ModuleLoader__.load({
 
     function PetOverlay() {
       const [characters] = useCharacters();
+      const [desktopOverlay, setDesktopOverlay] = useState(false);
+      useEffect(() => {
+        let timer = 0;
+        const check = () => { api('/desktop/status').then((body) => setDesktopOverlay(Boolean(body.running))).catch(() => {}); };
+        check(); timer = setInterval(check, 5000);
+        return () => clearInterval(timer);
+      }, []);
+      if (desktopOverlay) return null;
       const visible = characters.filter((item) => item.display && item.idle);
       if (visible.length === 0) return null;
       const cornerStyle = (character) => {
@@ -62,6 +70,20 @@ window.__ModuleLoader__.load({
       const [group, setGroup] = useState('全部');
       const [category, setCategory] = useState('全部');
       const [message, setMessage] = useState('');
+      const [desktop, setDesktop] = useState(false);
+      const refreshDesktop = async () => {
+        try { setDesktop(Boolean((await api('/desktop/status')).running)); } catch {}
+      };
+      useEffect(() => { void refreshDesktop(); const timer = setInterval(() => void refreshDesktop(), 5000); return () => clearInterval(timer); }, []);
+      const startDesktop = async () => {
+        setMessage('正在准备桌面模式（首次约需下载 158MB 运行时）…');
+        try { await post('/desktop/start', {}); setDesktop(true); setMessage('桌面模式已启动'); }
+        catch (error) { setMessage('桌面模式启动失败：' + error.message); }
+      };
+      const stopDesktop = async () => {
+        try { await post('/desktop/stop', {}); setDesktop(false); setMessage('桌面模式已关闭'); }
+        catch (error) { setMessage('关闭失败：' + error.message); }
+      };
 
       useEffect(() => {
         api('/catalog').then(setCatalog).catch((error) => setMessage('读取动作目录失败：' + error.message));
@@ -115,6 +137,7 @@ window.__ModuleLoader__.load({
               h('div', { style: { fontSize: '22px', fontWeight: 700, color: '#16233d' } }, '宠爱'),
               h('div', { style: { fontSize: '13px', color: '#5b6b8a', marginTop: '2px' } }, '独立 pamper 桌宠 · 不依赖 dsh-pet')
             ),
+            h('button', { type: 'button', onClick: () => void (desktop ? stopDesktop() : startDesktop()), style: { border: '1px solid rgba(15,35,80,.16)', background: desktop ? '#1f2329' : '#fff', borderRadius: '10px', padding: '8px 14px', cursor: 'pointer', color: desktop ? '#fff' : '#3b4a66', marginRight: '8px' } }, desktop ? '关闭桌面' : '桌面模式'),
             h('button', { type: 'button', onClick: () => void refresh(), style: { border: '1px solid rgba(15,35,80,.16)', background: '#fff', borderRadius: '10px', padding: '8px 14px', cursor: 'pointer', color: '#3b4a66' } }, '刷新')
           ),
           h('div', { style: { display: 'inline-flex', gap: '2px', background: '#f2f4f7', borderRadius: '11px', padding: '3px', margin: '16px 0' } },

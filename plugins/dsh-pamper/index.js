@@ -4,8 +4,9 @@
  */
 import { copyFile, cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import fs from 'node:fs';
 import { homedir } from 'node:os';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { basename, dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -15,6 +16,9 @@ export const inject = ['webServer'];
 const ROUTE = '/dsh-pamper-7470';
 const CATALOG_PATH = fileURLToPath(new URL('./catalog/action-store.json', import.meta.url));
 const ASSET_BASE = 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main';
+const HELPER_DIR = fileURLToPath(new URL('./helper/', import.meta.url));
+const ELECTRON_VERSION = '44.7.0';
+const ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/';
 const BASE_PACK_URL = 'https://github.com/Ai-nice/dsh-pamper/releases/download/v1.0.0/pets-base-v2.zip';
 const GROUP_OF = (kind) => {
   if (kind === 'main') return 'deepseek';
@@ -52,6 +56,47 @@ const readBody = async (req) => {
 };
 const readJson = async (path) => JSON.parse(await readFile(path, 'utf8'));
 const writeJson = async (path, value) => writeFile(path, JSON.stringify(value, null, 2) + '\n');
+
+async function ensureElectron(ctx) {
+  const targetDir = join(ownRoot(), 'electron');
+  const exe = join(targetDir, process.platform === 'win32' ? 'electron.exe' : 'electron');
+  if (await isFile(exe)) return exe;
+  await mkdir(targetDir, { recursive: true });
+  const zipPath = join(ownRoot(), 'electron.zip');
+  const platform = process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux';
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  const url = ELECTRON_MIRROR + ELECTRON_VERSION + '/electron-v' + ELECTRON_VERSION + '-' + platform + '-' + arch + '.zip';
+  ctx.logger?.info?.('[dsh-pamper] 正在下载桌面运行时 Electron（首次约 158MB）…');
+  let lastError = null;
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(600000) });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      await writeFile(zipPath, Buffer.from(await response.arrayBuffer()));
+      const result = spawnSync('tar', ['-xf', zipPath, '-C', targetDir], { windowsHide: true });
+      if (result.status !== 0) throw new Error('解压失败');
+      const findExe = (dir) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = join(dir, entry.name);
+          if (entry.isDirectory()) { const found = findExe(full); if (found) return found; }
+          else if (entry.name === (process.platform === 'win32' ? 'electron.exe' : 'electron')) return full;
+        }
+        return '';
+      };
+      const found = findExe(targetDir);
+      if (found) {
+        if (found !== exe) await copyFile(found, exe);
+        await rm(zipPath, { force: true });
+        return exe;
+      }
+      throw new Error('解压后找不到 electron 可执行文件');
+    } catch (error) {
+      lastError = error;
+      if (attempt < 5) await new Promise((resolveDelay) => setTimeout(resolveDelay, 800 * attempt));
+    }
+  }
+  throw new Error('Electron 下载失败：' + (lastError?.message || url));
+}
 
 async function downloadBasePack(ctx) {
   const zipPath = join(ownRoot(), 'base-pack.zip');
@@ -276,6 +321,7 @@ async function downloadAction(ctx, action) {
 }
 
 export function apply(ctx) {
+  let desktopChild = null;
   let catalogPromise = null;
   const loadCatalog = async () => {
     if (!catalogPromise) catalogPromise = readFile(CATALOG_PATH, 'utf8').then(JSON.parse);
@@ -372,6 +418,39 @@ export function apply(ctx) {
         if (animations.moves && Array.isArray(animations.moves.actions)) animations.moves.actions = animations.moves.actions.filter((action) => action && !names.includes(action.name));
         await saveConfig(kind, config);
         return sendJson(res, 200, { ok: true, removed: names.length });
+      }
+      if (req.method === 'GET' && path === 'desktop/status') {
+        return sendJson(res, 200, { ok: true, running: Boolean(desktopChild && desktopChild.exitCode === null), pid: desktopChild?.pid || null, electron: await isFile(join(ownRoot(), 'electron', process.platform === 'win32' ? 'electron.exe' : 'electron')) });
+      }
+      if (req.method === 'POST' && path === 'desktop/stop') {
+        if (desktopChild && desktopChild.exitCode === null) {
+          if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(desktopChild.pid), '/T', '/F'], { windowsHide: true });
+          else desktopChild.kill();
+        }
+        desktopChild = null;
+        return sendJson(res, 200, { ok: true, running: false });
+      }
+      if (req.method === 'POST' && path === 'desktop/start') {
+        const exe = await ensureElectron(ctx);
+        const pets = (await listPacks()).filter((item) => item.display && item.idle);
+        if (pets.length === 0) return sendJson(res, 400, { ok: false, error: '没有正在显示的角色' });
+        if (desktopChild && desktopChild.exitCode === null) {
+          if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(desktopChild.pid), '/T', '/F'], { windowsHide: true });
+          else desktopChild.kill();
+        }
+        const state = {
+          pets: pets.map((item) => ({
+            kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner,
+            marginX: item.marginX, marginY: item.marginY,
+            file: join(petsDir(), item.kind + '-animation', item.idle + '.webm')
+          })).filter((pet) => fs.existsSync(pet.file))
+        };
+        await writeJson(join(ownRoot(), 'desktop-state.json'), state);
+        const env = { ...process.env, PAMPER_DESKTOP_STATE: join(ownRoot(), 'desktop-state.json') };
+        delete env.ELECTRON_RUN_AS_NODE;
+        desktopChild = spawn(exe, ['--no-sandbox', HELPER_DIR], { env, cwd: ownRoot(), windowsHide: false, stdio: 'ignore' });
+        desktopChild.once('exit', () => { desktopChild = null; });
+        return sendJson(res, 200, { ok: true, running: true, pid: desktopChild.pid, count: state.pets.length });
       }
       return sendText(res, 404, 'not found');
     } catch (error) {
