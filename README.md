@@ -28,6 +28,14 @@
 > https://cdn.jsdelivr.net/gh/Ai-nice/dsh-pamper@main/plugin-tarballs/dsh-pamper.tgz
 > ```
 
+### npm 包（推荐，最简单）
+
+插件已发布到 npm：**`dsh-pamper@0.1.0`**
+
+- DSH「添加插件」直接填 **`dsh-pamper`** 即可安装，不需要访问 GitHub；
+- 国内可用 npmmirror 镜像；
+- 已实测 `pnpm install dsh-pamper@0.1.0` 安装成功（包内含动作目录）。
+
 ## DSH 插件市场（自定义索引）
 
 官方目前**没有公共插件索引**；其他插件也是通过「索引源」被发现。添加下面这个索引地址后，就能在插件市场里直接搜索并安装 **pamper**：
