@@ -106,6 +106,10 @@ window.__ModuleLoader__.load({
         try { await post('/toggle', { kind: character.kind, visible: !character.display }); await refresh(); setMessage(character.name + (character.display ? ' 已隐藏' : ' 已显示')); }
         catch (error) { setMessage('切换失败：' + error.message); }
       };
+      const toggleAllVisible = async (visible) => {
+        try { await post('/toggleAll', { visible }); await refresh(); setMessage(visible ? '已显示全部角色' : '已隐藏全部角色'); }
+        catch (error) { setMessage('批量切换失败：' + error.message); }
+      };
       const saveConfig = async (character, patch) => {
         try { await post('/config', { kind: character.kind, ...patch }); await refresh(); setMessage(character.name + ' 配置已保存'); }
         catch (error) { setMessage('保存失败：' + error.message); }
@@ -148,7 +152,7 @@ window.__ModuleLoader__.load({
           tab === 'characters' ? h(React.Fragment, null,
             h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f4f7fb', border: '1px solid rgba(15,35,80,.06)', borderRadius: '12px', padding: '10px 14px', marginBottom: '14px', fontSize: '13px', color: '#5b6b8a' } },
               h('span', null, characters.length + ' 位角色 · ' + characters.filter((item) => item.display).length + ' 个正在陪伴'),
-              h('span', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap' } }, groups.map((value) => h('button', { key: value, type: 'button', onClick: () => setGroup(value), style: { border: '1px solid ' + (group === value ? '#1f2329' : 'rgba(15,35,80,.14)'), background: group === value ? '#1f2329' : '#fff', color: group === value ? '#fff' : '#3b4a66', borderRadius: '999px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' } }, value)))
+              h('span', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' } }, h('button', { type: 'button', onClick: () => void toggleAllVisible(true), style: { border: '1px solid rgba(15,35,80,.14)', background: '#fff', color: '#3b4a66', borderRadius: '999px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' } }, '全部显示'), h('button', { type: 'button', onClick: () => void toggleAllVisible(false), style: { border: '1px solid rgba(15,35,80,.14)', background: '#fff', color: '#3b4a66', borderRadius: '999px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' } }, '全部隐藏'), h('span', { style: { width: '1px', height: '18px', background: 'rgba(15,35,80,.12)' } }), groups.map((value) => h('button', { key: value, type: 'button', onClick: () => setGroup(value), style: { border: '1px solid ' + (group === value ? '#1f2329' : 'rgba(15,35,80,.14)'), background: group === value ? '#1f2329' : '#fff', color: group === value ? '#fff' : '#3b4a66', borderRadius: '999px', padding: '3px 10px', cursor: 'pointer', fontSize: '12px' } }, value)))
             ),
             h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '16px' } }, shown.map((character) => card(
               h(React.Fragment, null,
