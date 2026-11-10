@@ -362,6 +362,36 @@ export function apply(ctx) {
   };
   void ensureMigrated(ctx);
 
+  const buildDesktopState = async () => {
+    const pets = (await listPacks()).filter((item) => item.display && item.idle);
+    const state = { pets: [] };
+    for (const item of pets) {
+      try {
+        const frames = await ensureFrames(ctx, item.kind, item.idle);
+        state.pets.push({ kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner, marginX: item.marginX, marginY: item.marginY, frames });
+      } catch (error) {
+        ctx.logger?.warn?.('[dsh-pamper] 桌面模式准备失败 ' + item.kind + '：' + (error instanceof Error ? error.message : String(error)));
+      }
+    }
+    return state;
+  };
+  const launchDesktop = async () => {
+    stopDesktop();
+    const state = await buildDesktopState();
+    if (state.pets.length === 0) return state;
+    const stateFile = join(ownRoot(), 'desktop-state.json');
+    await writeJson(stateFile, state);
+    const script = join(HELPER_DIR, 'desktop.ps1');
+    desktopChild = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-StatePath', stateFile], { cwd: ownRoot(), windowsHide: false, stdio: ['ignore', 'ignore', 'pipe'] });
+    desktopChild.stderr?.on('data', (chunk) => { try { fs.appendFileSync(join(ownRoot(), 'desktop-helper.log'), String(chunk)); } catch {} });
+    desktopChild.once('exit', () => { desktopChild = null; });
+    return state;
+  };
+  const refreshDesktopIfRunning = async () => {
+    if (!desktopChild || desktopChild.exitCode !== null) return;
+    try { await launchDesktop(); } catch (error) { ctx.logger?.warn?.('[dsh-pamper] 桌面模式刷新失败：' + (error instanceof Error ? error.message : String(error))); }
+  };
+
   const handle = async (req, res) => {
     const url = new URL(req.url || '/', 'http://localhost');
     const path = decodeURIComponent(url.pathname.slice(ROUTE.length)).replace(/^\/+/, '');
@@ -415,6 +445,7 @@ export function apply(ctx) {
             results.push(kind);
           } catch {}
         }
+        await refreshDesktopIfRunning();
         return sendJson(res, 200, { ok: true, visible, count: results.length });
       }
       if (req.method === 'POST' && path === 'toggle') {
@@ -426,6 +457,7 @@ export function apply(ctx) {
         if (!pet) return sendJson(res, 400, { ok: false, error: '缺少 pets[0]' });
         pet.display = body.visible ? 'desktop' : 'none';
         await saveConfig(kind, config);
+        await refreshDesktopIfRunning();
         return sendJson(res, 200, { ok: true, display: pet.display });
       }
       if (req.method === 'POST' && path === 'config') {
@@ -441,6 +473,7 @@ export function apply(ctx) {
         if (Number.isFinite(Number(body.marginX))) pet.position = { ...(pet.position || {}), marginX: Number(body.marginX) };
         if (Number.isFinite(Number(body.marginY))) pet.position = { ...(pet.position || {}), marginY: Number(body.marginY) };
         await saveConfig(kind, config);
+        await refreshDesktopIfRunning();
         return sendJson(res, 200, { ok: true });
       }
       if (req.method === 'POST' && path === 'load') {
@@ -488,29 +521,9 @@ export function apply(ctx) {
         return sendJson(res, 200, { ok: true, running: false });
       }
       if (req.method === 'POST' && path === 'desktop/start') {
-        const pets = (await listPacks()).filter((item) => item.display && item.idle);
-        if (pets.length === 0) return sendJson(res, 400, { ok: false, error: '没有正在显示的角色' });
-        if (desktopChild && desktopChild.exitCode === null) {
-          if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(desktopChild.pid), '/T', '/F'], { windowsHide: true });
-          else desktopChild.kill();
-        }
-        const state = { pets: [] };
-        for (const item of pets) {
-          try {
-            const frames = await ensureFrames(ctx, item.kind, item.idle);
-            state.pets.push({ kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner, marginX: item.marginX, marginY: item.marginY, frames });
-          } catch (error) {
-            ctx.logger?.warn?.('[dsh-pamper] 桌面模式准备失败 ' + item.kind + '：' + (error instanceof Error ? error.message : String(error)));
-          }
-        }
+        const state = await launchDesktop();
         if (state.pets.length === 0) return sendJson(res, 500, { ok: false, error: '没有可转换的桌面动画（需要 ffmpeg）' });
-        const stateFile = join(ownRoot(), 'desktop-state.json');
-        await writeJson(stateFile, state);
-        const script = join(HELPER_DIR, 'desktop.ps1');
-        desktopChild = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-StatePath', stateFile], { cwd: ownRoot(), windowsHide: false, stdio: ['ignore', 'ignore', 'pipe'] });
-        desktopChild.stderr?.on('data', (chunk) => { try { fs.appendFileSync(join(ownRoot(), 'desktop-helper.log'), String(chunk)); } catch {} });
-        desktopChild.once('exit', () => { desktopChild = null; });
-        return sendJson(res, 200, { ok: true, running: true, pid: desktopChild.pid, count: state.pets.length });
+        return sendJson(res, 200, { ok: true, running: true, pid: desktopChild?.pid || null, count: state.pets.length });
       }
       return sendText(res, 404, 'not found');
     } catch (error) {
