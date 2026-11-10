@@ -400,6 +400,10 @@ export function apply(ctx) {
       else desktopChild.kill();
     }
     desktopChild = null;
+    if (process.platform === 'win32') {
+      // 清掉失去父进程的旧 helper（按窗口标题精确匹配，不碰其他 PowerShell）
+      spawnSync('taskkill', ['/IM', 'powershell.exe', '/FI', 'WINDOWTITLE eq pamper-desktop-helper', '/F'], { windowsHide: true });
+    }
   };
   ctx.effect(() => () => stopDesktop());
   let catalogPromise = null;

@@ -6,6 +6,10 @@ using System.Runtime.InteropServices;
 public class PamperTop {
   [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT point);
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+  [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X; public int Y; }
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
 }
 '@
 
@@ -14,6 +18,7 @@ $app = New-Object System.Windows.Application
 $app.ShutdownMode = 'OnExplicitShutdown'
 $windows = New-Object System.Collections.ArrayList
 $timers = New-Object System.Collections.ArrayList
+$sources = New-Object System.Collections.ArrayList
 $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
 
 function Set-PetDisplay($id, $display) {
@@ -240,9 +245,32 @@ foreach ($pet in @($state.pets)) {
   $topTimer.Add_Tick({ [PamperTop]::SetWindowPos([IntPtr]$topCtx.handle, [IntPtr](-1), 0, 0, 0, 0, 0x0013) | Out-Null; $topCtx.window.Topmost = $true }.GetNewClosure())
   $topTimer.Start()
   $timers.Add($topTimer) | Out-Null
+  $source = [System.Windows.Interop.HwndSource]::FromHwnd($handle)
+  if ($source) {
+    $source.AddHook({
+      param($hwnd, $msg, $wParam, $lParam, $handled)
+      if ($msg -eq 0x84) {
+        $pt = New-Object PamperTop+POINT
+        [PamperTop]::GetCursorPos([ref]$pt) | Out-Null
+        $rect = New-Object PamperTop+RECT
+        [PamperTop]::GetWindowRect($hwnd, [ref]$rect) | Out-Null
+        $width = [Math]::Max(1, $rect.Right - $rect.Left)
+        $height = [Math]::Max(1, $rect.Bottom - $rect.Top)
+        $rx = ($pt.X - $rect.Left) / $width
+        $ry = ($pt.Y - $rect.Top) / $height
+        $inside = ($rx -ge 0.18 -and $rx -le 0.82 -and $ry -ge 0.08 -and $ry -le 0.95)
+        $handled.Value = $true
+        if ($inside) { return [IntPtr]1 }
+        return [IntPtr](-1)
+      }
+      return [IntPtr]::Zero
+    }.GetNewClosure())
+    $sources.Add($source) | Out-Null
+  }
 }
 
 [System.Windows.Threading.Dispatcher]::Run() | Out-Null
+
 
 
 
