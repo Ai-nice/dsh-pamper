@@ -29,6 +29,11 @@ $frames = @{}
 $timers = New-Object System.Collections.ArrayList
 
 $window.Add_SourceInitialized({
+  $dpi = [System.Windows.Media.VisualTreeHelper]::GetDpi($window)
+  $window.Width = $window.Width / $dpi.DpiScaleX
+  $window.Height = $window.Height / $dpi.DpiScaleY
+  $window.Left = 0
+  $window.Top = 0
   $helper = New-Object System.Windows.Interop.WindowInteropHelper($window)
   $handle = $helper.Handle
   $style = [PamperWin]::GetWindowLong($handle, -20)
