@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <style>
-    html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; }
+    html, body { margin: 0; width: 100%; height: 100%; background: #00ff00; overflow: hidden; }
     #stage { position: fixed; inset: 0; pointer-events: none; }
     .pet { position: absolute; display: block; }
-    .pet canvas { display: block; width: 100%; height: auto; filter: drop-shadow(0 10px 18px rgba(15,23,42,.22)); }
+    .pet video { display: block; width: 100%; height: 100%; object-fit: contain; }
   </style>
 </head>
 <body>
@@ -14,47 +14,31 @@
   <script>
     const params = new URLSearchParams(location.search);
     let state = { pets: [] };
-    try { state = JSON.parse(params.get('state') || '{}'); } catch (error) { console.error('pamper helper: state parse', error); }
+    try { state = JSON.parse(params.get('state') || '{}'); } catch {}
     const stage = document.getElementById('stage');
     const toFileUrl = (filePath) => encodeURI('file:///' + String(filePath).replace(/\\/g, '/').replace(/^\/+/, ''));
     for (const pet of state.pets || []) {
+      const width = Math.max(120, Math.min(Number(pet.size) || 420, 900));
       const holder = document.createElement('div');
       holder.className = 'pet';
+      holder.style.width = width + 'px';
+      holder.style.height = Math.round(width * 9 / 16) + 'px';
       const corner = pet.corner || 'top-right';
       const mx = Number(pet.marginX) || 24;
       const my = Number(pet.marginY) || 100;
-      holder.style.width = Math.max(120, Math.min(Number(pet.size) || 420, 900)) + 'px';
       if (corner.includes('left')) holder.style.left = mx + 'px'; else holder.style.right = mx + 'px';
       if (corner.includes('bottom')) holder.style.bottom = my + 'px'; else holder.style.top = my + 'px';
-      const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 360;
       const video = document.createElement('video');
-      video.src = toFileUrl(pet.file);
-      video.autoplay = true;
-      video.loop = true;
       video.muted = true;
+      video.loop = true;
       video.playsInline = true;
-      video.style.display = 'none';
-      document.body.appendChild(video);
-      const context = canvas.getContext('2d');
-      const draw = () => {
-        if (video.readyState >= 2) {
-          if (canvas.width !== video.videoWidth) { canvas.width = video.videoWidth; canvas.height = video.videoHeight; }
-          context.clearRect(0, 0, canvas.width, canvas.height);
-          context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        }
-        requestAnimationFrame(draw);
-      };
-      video.addEventListener('loadedmetadata', () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        video.play().catch((error) => console.error('pamper helper: play failed', error));
-        draw();
-        console.log('pamper helper: metadata', video.videoWidth, video.videoHeight);
-      });
-      video.addEventListener('error', () => console.error('pamper helper: video error', video.src, video.error));
-      holder.appendChild(canvas);
+      video.autoplay = true;
+      video.preload = 'auto';
+      video.addEventListener('loadeddata', () => { video.play().catch((error) => console.error('play failed', error)); });
+      video.addEventListener('canplay', () => { video.play().catch((error) => console.error('play failed', error)); });
+      video.addEventListener('error', () => console.error('video error', video.src, video.error && video.error.message));
+      video.src = toFileUrl(pet.file);
+      holder.appendChild(video);
       stage.appendChild(holder);
       console.log('pamper helper: pet', pet.kind, video.src);
     }
