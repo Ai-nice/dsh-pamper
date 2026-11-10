@@ -13,7 +13,7 @@ git init
 # .gitignore 已排除：assets/pet-store、assets/spritesheet-cache、dist、webm-store、release、.build-tmp
 git add .
 git commit -m "pamper: DSH 宠爱页 / 动作按需加载插件"
-git remote add origin https://github.com/Ai-nice/pamper.git
+git remote add origin https://github.com/Ai-nice/dsh-pamper.git
 git push -u origin main
 ```
 
@@ -27,7 +27,7 @@ cd "D:\PC\DSH\pamper\webm-store"
 git init
 git add .
 git commit -m "pamper action assets (prebuilt alpha WebM)"
-git remote add origin https://github.com/Ai-nice/pamper-assets.git
+git remote add origin https://Ai-nice/pamper-assets.git
 git push -u origin main
 ```
 
@@ -59,7 +59,7 @@ node scripts/pack-release.mjs
    ```json
    { "basePackUrl": "<pets-base.zip 的 Release 下载直链>", "assetsBaseUrl": "https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main" }
    ```
-2. `plugin/dsh-action-store/cordis.patch.yml`：
+2. `plugin/dsh-pamper/cordis.patch.yml`：
    ```yaml
    assetBaseUrl: 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main'
    ```
@@ -69,12 +69,12 @@ node scripts/pack-release.mjs
 
 ```powershell
 # 1. 拿轻量仓库（clone 或下载 pamper-lite.zip）
-git clone https://github.com/Ai-nice/pamper.git
+git clone https://github.com/Ai-nice/dsh-pamper.git
 cd pamper
 # 2. 下载 8 个基础形象并安装（自动读 release-config.json 的 basePackUrl）
 node scripts/install-lite.mjs
 # 3. 安装插件（DSH Host 侧，一次）
-#    在 DSH 里用 plugin_manager install_bundle，target 选本目录 plugin/dsh-action-store
+#    在 DSH 里用 plugin_manager install_bundle，target 选本目录 plugin/dsh-pamper
 # 4. 打开 DSH → 宠爱 → 发现；点动作「加载」时插件自动从 assetsBaseUrl 下载对应 WebM 并缓存
 ```
 

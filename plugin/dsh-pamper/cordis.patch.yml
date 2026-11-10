@@ -1,6 +1,6 @@
 - insert:
-    - id: dsh-action-store
-      name: dsh-action-store
+    - id: dsh-pamper
+      name: dsh-pamper
       config:
         storeRoot: 'D:/PC/DSH/pamper/assets/pet-store'
         catalogPath: 'D:/PC/DSH/pamper/catalog/action-store.json'

@@ -1,9 +1,9 @@
 {
-  "name": "dsh-action-store",
+  "name": "dsh-pamper",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "按需加载桌面宠物动作库：发现、转换、安装与卸载。",
+  "description": "Pamper 桌宠动作库：发现并按需下载/安装透明 WebM 动作。",
   "exports": {
     ".": "./index.js",
     "./locale/*.json": "./locale/*.json",

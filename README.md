@@ -29,10 +29,10 @@
 用户安装：
 
 ```powershell
-git clone https://github.com/Ai-nice/pamper.git
+git clone https://github.com/Ai-nice/dsh-pamper.git
 cd pamper
 node scripts/install-lite.mjs   # 自动从 Release 下载 pets-base.zip 并安装
-# 再在 DSH 里安装 plugin/dsh-action-store（一次）
+# 再在 DSH 里安装 plugin/dsh-pamper（一次）
 ```
 
 之后打开 **宠爱 → 发现**，点动作「加载」时插件会从 `assetBaseUrl` 下载对应 WebM 到本地缓存再安装，**不需要 ffmpeg、不需要下载整个素材库**。
@@ -73,7 +73,7 @@ node scripts/patch-dsh-pet.mjs --revert   # 还原（含 main-config 与包内 c
 > 补丁改的是 dsh-pet 插件运行期文件（`runtime/electron-helper/sprite/menu.js` 与 `lib/client.js`）+ 用户 `main-config.jsonc`；插件升级/重装会覆盖，需要重跑。刷新 DSH 页面（Ctrl+F5）后生效。
 - 「宠爱」页的**角色页**：右上角是官方同款圆形「刷新」图标 + 深色「＋ 添加角色 ▾」按钮；副标题为「一碗碗大米饭就是对你的宠爱…」；「角色 / 桌宠配置」为胶囊分段切换。统计栏保持**一行**：**「N 位角色 · M 个正在桌面陪伴」**（随开关实时变化）+「刷新列表 / 全部开启 / 全部隐藏」三个按钮（白底描边，鼠标悬停变黑底白字，点击即执行）。每个角色一张预览卡（角色图 + 「N 个动作 · 独立角色项目」+ 右上角「详情」文字链），**三列网格**、可纵向滚动；与官方插件页一致的开关（40×22 胶囊轨道 + 18px 白色圆形圆钮；开启=深黑轨道，关闭=浅灰轨道，0.2s 平滑滑动）控制显示（开启 = 只在桌面显示并只开该角色第一只实例，关闭 = 全部实例隐藏），卡片左上角显示「已隐藏」。点「详情」会切到「桌宠配置」并自动选中这个角色。
 - 「宠爱」页的**桌宠配置页**：与「设置 → 桌宠配置」完全同一套页面，功能不变（分组、实例、大小、位置、显示方式、保存等），宽度自适应页面。
-## 发现：动作按需加载（dsh-action-store 插件）
+## 发现：动作按需加载（dsh-pamper 插件）
 
 除了「角色 / 桌宠配置」，宠爱页新增 **「发现」** 第三页：从 `assets/pet-store/` 的完整动作库（4 角色 / 6 动作包 / **819 个动作**：小女仆 268、白龙娘 285、橙发书娘 166、紫发猫耳娘 100）里挑动作，按需转成透明 WebM 并加载进对应形象。
 
@@ -84,14 +84,14 @@ node scripts/patch-dsh-pet.mjs --revert   # 还原（含 main-config 与包内 c
 
 ### 插件安装
 
-发现页的后端是项目内的小型 DSH host 插件 `plugin/dsh-action-store/`（注册 `/dsh-action-store-7462/*` 路由）。安装一次即可：
+发现页的后端是项目内的小型 DSH host 插件 `plugin/dsh-pamper/`（注册 `/dsh-pamper-7462/*` 路由）。安装一次即可：
 
 ```powershell
 # 在 DSH 里通过 plugin_manager install_bundle 安装（target 用绝对路径）
-# C:\...\pamper\plugin\dsh-action-store
+# C:\...\pamper\plugin\dsh-pamper
 ```
 
-插件读取的路径写在 `plugin/dsh-action-store/cordis.patch.yml`：`storeRoot`（动作库）与 `catalogPath`（发现页目录），项目移动后改这两个路径并重装插件即可。
+插件读取的路径写在 `plugin/dsh-pamper/cordis.patch.yml`：`storeRoot`（动作库）与 `catalogPath`（发现页目录），项目移动后改这两个路径并重装插件即可。
 
 ![发现页](<D:\PC\DSH\pamper\preview\discovery-shot.png>)
 ## 目录
@@ -309,7 +309,7 @@ node scripts/serve.mjs
 
 - 「宠爱」页的**角色页**：右上角是官方同款圆形「刷新」图标 + 深色「＋ 添加角色 ▾」按钮；副标题为「一碗碗大米饭就是对你的宠爱…」；「角色 / 桌宠配置」为胶囊分段切换。统计栏保持**一行**：**「N 位角色 · M 个正在桌面陪伴」**（随开关实时变化）+「刷新列表 / 全部开启 / 全部隐藏」三个按钮（白底描边，鼠标悬停变黑底白字，点击即执行）。每个角色一张预览卡（角色图 + 「N 个动作 · 独立角色项目」+ 右上角「详情」文字链），**三列网格**、可纵向滚动；与官方插件页一致的开关（40×22 胶囊轨道 + 18px 白色圆形圆钮；开启=深黑轨道，关闭=浅灰轨道，0.2s 平滑滑动）控制显示（开启 = 只在桌面显示并只开该角色第一只实例，关闭 = 全部实例隐藏），卡片左上角显示「已隐藏」。点「详情」会切到「桌宠配置」并自动选中这个角色。
 - 「宠爱」页的**桌宠配置页**：与「设置 → 桌宠配置」完全同一套页面，功能不变（分组、实例、大小、位置、显示方式、保存等），宽度自适应页面。
-## 发现：动作按需加载（dsh-action-store 插件）
+## 发现：动作按需加载（dsh-pamper 插件）
 
 除了「角色 / 桌宠配置」，宠爱页新增 **「发现」** 第三页：从 `assets/pet-store/` 的完整动作库（4 角色 / 6 动作包 / **819 个动作**：小女仆 268、白龙娘 285、橙发书娘 166、紫发猫耳娘 100）里挑动作，按需转成透明 WebM 并加载进对应形象。
 
@@ -320,14 +320,14 @@ node scripts/serve.mjs
 
 ### 插件安装
 
-发现页的后端是项目内的小型 DSH host 插件 `plugin/dsh-action-store/`（注册 `/dsh-action-store-7462/*` 路由）。安装一次即可：
+发现页的后端是项目内的小型 DSH host 插件 `plugin/dsh-pamper/`（注册 `/dsh-pamper-7462/*` 路由）。安装一次即可：
 
 ```powershell
 # 在 DSH 里通过 plugin_manager install_bundle 安装（target 用绝对路径）
-# C:\...\pamper\plugin\dsh-action-store
+# C:\...\pamper\plugin\dsh-pamper
 ```
 
-插件读取的路径写在 `plugin/dsh-action-store/cordis.patch.yml`：`storeRoot`（动作库）与 `catalogPath`（发现页目录），项目移动后改这两个路径并重装插件即可。
+插件读取的路径写在 `plugin/dsh-pamper/cordis.patch.yml`：`storeRoot`（动作库）与 `catalogPath`（发现页目录），项目移动后改这两个路径并重装插件即可。
 
 ![发现页](<D:\PC\DSH\pamper\preview\discovery-shot.png>)
 ## 目录结构

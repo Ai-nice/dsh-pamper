@@ -21,7 +21,7 @@ const TARGETS = {
   gemini: { kind: 'aboutme-gemini', name: '紫发猫耳娘' }
 };
 
-export const name = 'dsh-action-store';
+export const name = 'dsh-pamper';
 export const inject = ['webServer'];
 
 const DEFAULT_ASSET_BASE_URL = '';
@@ -286,7 +286,7 @@ export function apply(ctx, config = {}) {
           break;
         } catch (error) {
           lastError = error;
-          ctx.logger?.warn?.('[dsh-action-store] 下载失败（第 ' + attempt + '/5 次）：' + (error instanceof Error ? error.message : String(error)));
+          ctx.logger?.warn?.('[dsh-pamper] 下载失败（第 ' + attempt + '/5 次）：' + (error instanceof Error ? error.message : String(error)));
           if (attempt < 5) await new Promise((r) => setTimeout(r, 800 * attempt));
         }
       }
@@ -308,7 +308,7 @@ export function apply(ctx, config = {}) {
     await writePackConfig(target.kind, minimalMaidConfig(base.name));
     const avatar = join(storeRoot, 'pets', target.storePack, 'avatar.webp');
     if (await isFile(avatar)) await copyFile(avatar, join(dshPetRoot, 'pet', target.kind + '-avatar.webp'));
-    ctx.logger?.info?.(`[dsh-action-store] 已创建形象包 ${target.kind}`);
+    ctx.logger?.info?.(`[dsh-pamper] 已创建形象包 ${target.kind}`);
   };
 
   const reloadPet = async () => {
@@ -318,7 +318,7 @@ export function apply(ctx, config = {}) {
       await fetch(origin + DSH_PET_ROUTE + '/reload', { method: 'POST' });
       return true;
     } catch (error) {
-      ctx.logger?.warn?.(`[dsh-action-store] 通知 dsh-pet 重载失败：${error instanceof Error ? error.message : String(error)}`);
+      ctx.logger?.warn?.(`[dsh-pamper] 通知 dsh-pet 重载失败：${error instanceof Error ? error.message : String(error)}`);
       return false;
     }
   };
@@ -397,7 +397,7 @@ export function apply(ctx, config = {}) {
             try {
               installed = await installWebmFromRemote(action, animationDirOf(target.kind));
             } catch (error) {
-              ctx.logger?.warn?.('[dsh-action-store] ' + (error instanceof Error ? error.message : String(error)));
+              ctx.logger?.warn?.('[dsh-pamper] ' + (error instanceof Error ? error.message : String(error)));
             }
             if (!installed) await convertAction({ storeRoot, action, animationDir: animationDirOf(target.kind) });
             else remoteCount += 1;
@@ -449,7 +449,7 @@ export function apply(ctx, config = {}) {
       }
       return sendText(res, 404, 'not found');
     } catch (error) {
-      ctx.logger?.warn?.(`[dsh-action-store] route failed: ${error instanceof Error ? error.message : String(error)}`);
+      ctx.logger?.warn?.(`[dsh-pamper] route failed: ${error instanceof Error ? error.message : String(error)}`);
       return sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
     }
   };
