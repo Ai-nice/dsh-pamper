@@ -74,6 +74,7 @@ window.__ModuleLoader__.load({
       const selectedCatalog = catalog && catalog.characters.find((item) => item.key === selectedCharacter?.kind || item.key === selectedCharacter?.group);
       const groups = ['全部', ...new Set(characters.map((item) => item.group))];
       const shown = group === '全部' ? characters : characters.filter((item) => item.group === group);
+      const loadedNames = new Set(selectedCharacter?.loadedActions || []);
       const actions = selectedCatalog
         ? (category === '全部' ? selectedCatalog.actions : selectedCatalog.actions.filter((action) => action.category === category))
         : [];
@@ -96,6 +97,14 @@ window.__ModuleLoader__.load({
         } catch (error) { setMessage('加载失败：' + error.message); }
       };
 
+      const unloadAction = async (action) => {
+        if (!selectedCharacter) return;
+        try {
+          await post('/unload', { kind: selectedCharacter.kind, actions: [action.name] });
+          setMessage('已卸载「' + action.name + '」');
+          await refresh();
+        } catch (error) { setMessage('卸载失败：' + error.message); }
+      };
       const tabButton = (id, label) => h('button', { type: 'button', onClick: () => setTab(id), style: { border: 'none', background: tab === id ? '#fff' : 'transparent', color: tab === id ? '#16233d' : '#5b6b8a', fontWeight: tab === id ? 700 : 500, borderRadius: '9px', padding: '8px 18px', cursor: 'pointer' } }, label);
       const card = (children, extra) => h('div', { style: { background: '#fff', border: '1px solid rgba(15,35,80,.10)', borderRadius: '16px', boxShadow: '0 8px 24px rgba(20,40,90,.06)', ...(extra || {}) } }, children);
 
@@ -137,6 +146,8 @@ window.__ModuleLoader__.load({
                 h('img', { src: avatarUrl(character.kind), alt: '', style: { width: '44px', height: '44px', borderRadius: '10px', objectFit: 'cover', background: '#eef2f8' } }),
                 h('div', { style: { flex: 1 } }, h('div', { style: { fontWeight: 700, color: '#16233d' } }, character.name), h('div', { style: { fontSize: '12px', color: '#5b6b8a' } }, character.group))
               ),
+              h('label', { style: { fontSize: '12px', color: '#5b6b8a' } }, '名字'),
+              h('input', { type: 'text', defaultValue: character.name, onBlur: (event) => { if (event.target.value.trim() && event.target.value.trim() !== character.name) void saveConfig(character, { name: event.target.value.trim() }); }, style: { width: '100%', padding: '6px 8px', borderRadius: '8px', border: '1px solid rgba(15,35,80,.14)', margin: '4px 0 10px', boxSizing: 'border-box' } }),
               h('label', { style: { fontSize: '12px', color: '#5b6b8a' } }, '尺寸：' + character.size + 'px'),
               h('input', { type: 'range', min: 120, max: 720, step: 20, defaultValue: character.size, onMouseUp: (event) => void saveConfig(character, { size: Number(event.target.value) }), style: { width: '100%' } }),
               h('label', { style: { fontSize: '12px', color: '#5b6b8a', display: 'block', marginTop: '8px' } }, '位置'),
@@ -163,7 +174,9 @@ window.__ModuleLoader__.load({
                   h('div', { style: { fontSize: '13px', fontWeight: 600, color: '#16233d', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } }, action.name),
                   h('div', { style: { fontSize: '11px', color: '#8a94a8', marginTop: '2px' } }, action.category)
                 ),
-                h('button', { type: 'button', onClick: () => void loadAction(action), style: { border: 'none', borderRadius: '7px', padding: '5px 10px', fontSize: '12px', cursor: 'pointer', background: '#1f2329', color: '#fff' } }, '加载')
+                loadedNames.has(action.name)
+                  ? h('button', { type: 'button', onClick: () => void unloadAction(action), style: { border: 'none', borderRadius: '7px', padding: '5px 10px', fontSize: '12px', cursor: 'pointer', background: '#eef4ff', color: '#2f6bff' } }, '卸载')
+                  : h('button', { type: 'button', onClick: () => void loadAction(action), style: { border: 'none', borderRadius: '7px', padding: '5px 10px', fontSize: '12px', cursor: 'pointer', background: '#1f2329', color: '#fff' } }, '加载')
               )
             )))
           ) : null

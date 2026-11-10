@@ -217,6 +217,7 @@ async function listPacks() {
         marginX: Number(pet?.position?.marginX) || 24,
         marginY: Number(pet?.position?.marginY) || 100,
         actionCount: actions.size,
+        loadedActions: [...actions],
         idle: Array.isArray(animations.idle) ? animations.idle[0] : null
       });
     } catch (error) {
@@ -327,6 +328,7 @@ export function apply(ctx) {
         const config = await loadConfig(kind);
         const pet = config.pets?.[0];
         if (!pet) return sendJson(res, 400, { ok: false, error: '缺少 pets[0]' });
+        if (typeof body.name === 'string' && body.name.trim()) pet.name = body.name.trim().slice(0, 40);
         if (Number.isFinite(Number(body.size))) pet.size = Math.max(80, Math.min(900, Number(body.size)));
         if (typeof body.corner === 'string') pet.position = { ...(pet.position || {}), corner: body.corner };
         if (Number.isFinite(Number(body.marginX))) pet.position = { ...(pet.position || {}), marginX: Number(body.marginX) };
@@ -355,6 +357,21 @@ export function apply(ctx) {
         }
         await saveConfig(kind, config);
         return sendJson(res, 200, { ok: true, loaded: done, failed });
+      }
+      if (req.method === 'POST' && path === 'unload') {
+        const body = await readBody(req);
+        const kind = String(body.kind || '');
+        const names = Array.isArray(body.actions) ? body.actions : [];
+        if (!/^[a-z0-9_-]+$/i.test(kind)) return sendJson(res, 400, { ok: false, error: 'bad kind' });
+        const config = await loadConfig(kind);
+        const animations = config.animations || {};
+        const removeFrom = (list) => Array.isArray(list) ? list.filter((name) => !names.includes(name)) : list;
+        for (const key of ['idle', 'turn', 'drag', 'clicks']) animations[key] = removeFrom(animations[key]);
+        for (const category of Array.isArray(animations.categories) ? animations.categories : []) category.actions = removeFrom(category.actions) || [];
+        for (const key of Object.keys(animations.events || {})) animations.events[key] = removeFrom(animations.events[key]);
+        if (animations.moves && Array.isArray(animations.moves.actions)) animations.moves.actions = animations.moves.actions.filter((action) => action && !names.includes(action.name));
+        await saveConfig(kind, config);
+        return sendJson(res, 200, { ok: true, removed: names.length });
       }
       return sendText(res, 404, 'not found');
     } catch (error) {
