@@ -1,7 +1,6 @@
 {
   "name": "dsh-pamper",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Pamper 桌宠动作库：发现并按需下载/安装透明 WebM 动作。",
   "exports": {
@@ -13,11 +12,30 @@
     "index.js",
     "cordis.patch.yml",
     "locale/*.json",
-    "icon.svg"
+    "icon.svg",
+    "catalog/action-store.json"
   ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
-  }
+  },
+  "author": "Ai-nice",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ai-nice/dsh-pamper.git",
+    "directory": "plugins/dsh-pamper"
+  },
+  "homepage": "https://github.com/Ai-nice/dsh-pamper",
+  "bugs": {
+    "url": "https://github.com/Ai-nice/dsh-pamper/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "desktop-pet",
+    "actions",
+    "dsh-pet"
+  ]
 }

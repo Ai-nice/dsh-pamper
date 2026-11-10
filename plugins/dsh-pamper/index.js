@@ -10,6 +10,7 @@ import { spawn } from 'node:child_process';
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const ROUTE_SEGMENT = '/dsh-action-store-7462';
 const DSH_PET_ROUTE = '/dsh-pet-7340';
@@ -24,7 +25,7 @@ const TARGETS = {
 export const name = 'dsh-pamper';
 export const inject = ['webServer'];
 
-const DEFAULT_ASSET_BASE_URL = '';
+const DEFAULT_ASSET_BASE_URL = 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main';
 
 function resolveDshPetRoot() {
   const home = process.env.DSH_HOME || join(homedir(), '.dsh');
@@ -180,8 +181,8 @@ function minimalMaidConfig(baseAction) {
 }
 
 export function apply(ctx, config = {}) {
-  const storeRoot = config.storeRoot || 'D:/PC/DSH/pamper/assets/pet-store';
-  const catalogPath = config.catalogPath || 'D:/PC/DSH/pamper/catalog/action-store.json';
+  const storeRoot = config.storeRoot || '';
+  const catalogPath = config.catalogPath || fileURLToPath(new URL('./catalog/action-store.json', import.meta.url));
   const assetBaseUrl = String(config.assetBaseUrl || DEFAULT_ASSET_BASE_URL).replace(/\/+$/, '');
   const cacheRoot = String(config.cacheRoot || '').trim() || join(resolveDshPetRoot(), 'action-cache');
   const dshPetRoot = resolveDshPetRoot();
