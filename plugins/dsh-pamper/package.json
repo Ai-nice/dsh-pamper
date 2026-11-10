@@ -1,6 +1,6 @@
 {
   "name": "dsh-pamper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Pamper 桌宠动作库：发现并按需下载/安装透明 WebM 动作。",
   "exports": {
@@ -13,7 +13,8 @@
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
-    "catalog/action-store.json"
+    "catalog/action-store.json",
+    "patcher/**"
   ],
   "dsh": {
     "bundle": {

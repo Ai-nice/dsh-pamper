@@ -6,8 +6,9 @@
  *  2. 按需把精灵图转成 dsh-pet 可播放的透明 WebM，并合并进对应形象的 config；
  *  3. 卸载动作（移除配置引用 + 删除 WebM），最后通知 dsh-pet 重载配置。
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -454,6 +455,19 @@ export function apply(ctx, config = {}) {
       return sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
     }
   };
+
+  // 安装/启动时自动给 dsh-pet 打上「宠爱」入口补丁（失败不阻塞插件）。
+  try {
+    const profileDir = process.env.DSH_PROFILE_DIR || '';
+    const dshPetDir = profileDir ? join(profileDir, 'node_modules', 'dsh-pet') : '';
+    if (dshPetDir && existsSync(join(dshPetDir, 'lib', 'client.js'))) {
+      const patcher = fileURLToPath(new URL('./patcher/patch-dsh-pet.mjs', import.meta.url));
+      const result = spawnSync(process.execPath, [patcher, '--package=' + dshPetDir], { stdio: 'ignore', windowsHide: true });
+      ctx.logger?.info?.('[dsh-pamper] dsh-pet「宠爱」入口补丁：' + (result.status === 0 ? '已应用/已存在，刷新页面生效' : '应用失败，请查看日志'));
+    }
+  } catch (error) {
+    ctx.logger?.warn?.('[dsh-pamper] 自动补丁失败：' + (error instanceof Error ? error.message : String(error)));
+  }
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
