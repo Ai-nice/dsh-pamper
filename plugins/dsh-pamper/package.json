@@ -1,15 +1,17 @@
 {
   "name": "dsh-pamper",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
-  "description": "宠爱页面 + 动作库插件：基于 dsh-pet 自动应用 Pamper UI 补丁，提供角色/桌宠配置/发现页和按需动作下载。",
+  "description": "宠爱页面套件：自动给 dsh-pet 打补丁，提供角色/桌宠配置/发现页与动作按需下载。",
   "exports": {
     ".": "./index.js",
+    "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
     "index.js",
+    "client.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
@@ -19,6 +21,10 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
     }
   },
   "author": "Ai-nice",

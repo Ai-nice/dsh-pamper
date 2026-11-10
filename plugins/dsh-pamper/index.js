@@ -8,10 +8,11 @@
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const ROUTE_SEGMENT = '/dsh-action-store-7462';
 const DSH_PET_ROUTE = '/dsh-pet-7340';
@@ -27,6 +28,28 @@ export const name = 'dsh-pamper';
 export const inject = ['webServer'];
 
 const DEFAULT_ASSET_BASE_URL = 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main';
+
+const requireFromPlugin = createRequire(import.meta.url);
+function resolveDshPetPackageDir() {
+  try {
+    return dirname(requireFromPlugin.resolve('dsh-pet/package.json'));
+  } catch {}
+  const home = process.env.DSH_HOME || join(homedir(), '.dsh');
+  const profileCandidates = [];
+  if (process.env.DSH_PROFILE_DIR) profileCandidates.push(process.env.DSH_PROFILE_DIR);
+  try {
+    const profilesRoot = join(home, 'profiles');
+    for (const entry of readdirSync(profilesRoot, { withFileTypes: true })) {
+      if (entry.isDirectory()) profileCandidates.push(join(profilesRoot, entry.name));
+    }
+  } catch {}
+  for (const profileDir of profileCandidates) {
+    const candidate = join(profileDir, 'node_modules', 'dsh-pet');
+    if (existsSync(candidate)) return candidate;
+  }
+  return '';
+}
+
 
 function resolveDshPetRoot() {
   const home = process.env.DSH_HOME || join(homedir(), '.dsh');
@@ -343,6 +366,29 @@ export function apply(ctx, config = {}) {
     const url = new URL(req.url || '/', 'http://localhost');
     const path = decodeURIComponent(url.pathname.slice(ROUTE_SEGMENT.length)).replace(/^\/+/, '');
     try {
+      if (req.method === 'GET' && path === 'ensure') {
+        let applied = false;
+        let changed = false;
+        let had = false;
+        try {
+          const dshPetDir = resolveDshPetPackageDir();
+          const clientFile = dshPetDir ? join(dshPetDir, 'lib', 'client.js') : '';
+          const before = clientFile && existsSync(clientFile) ? await readFile(clientFile, 'utf8') : '';
+          had = before.includes('pet-love');
+          if (clientFile && before) {
+            const patcher = fileURLToPath(new URL('./patcher/patch-dsh-pet.mjs', import.meta.url));
+            const result = spawnSync(process.execPath, [patcher, '--package=' + dshPetDir], { stdio: 'ignore', windowsHide: true });
+            if (result.status === 0) {
+              const after = await readFile(clientFile, 'utf8');
+              applied = after.includes('pet-love');
+              changed = applied && !had;
+            }
+          }
+        } catch (error) {
+          ctx.logger?.warn?.('[dsh-pamper] ensure failed: ' + (error instanceof Error ? error.message : String(error)));
+        }
+        return sendJson(res, 200, { ok: true, patched: applied || had, changed });
+      }
       if (req.method === 'GET' && path === 'catalog') {
         const catalog = await loadCatalog();
         const packsOnDisk = new Set();
@@ -458,8 +504,7 @@ export function apply(ctx, config = {}) {
 
   // 安装/启动时自动给 dsh-pet 打上「宠爱」入口补丁（失败不阻塞插件）。
   try {
-    const profileDir = process.env.DSH_PROFILE_DIR || '';
-    const dshPetDir = profileDir ? join(profileDir, 'node_modules', 'dsh-pet') : '';
+    const dshPetDir = resolveDshPetPackageDir();
     if (dshPetDir && existsSync(join(dshPetDir, 'lib', 'client.js'))) {
       const patcher = fileURLToPath(new URL('./patcher/patch-dsh-pet.mjs', import.meta.url));
       const result = spawnSync(process.execPath, [patcher, '--package=' + dshPetDir], { stdio: 'ignore', windowsHide: true });
