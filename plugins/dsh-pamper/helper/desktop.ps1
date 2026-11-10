@@ -74,7 +74,9 @@ foreach ($pet in @($state.pets)) {
   [System.Windows.Automation.AutomationProperties]::SetName($image, 'pamper-pet-' + $pet.kind)
   $canvas.Children.Add($image) | Out-Null
 
-  $frameState = @{ index = 0; frames = $frameList }
+  $clickFrames = @($pet.clicks)
+  $dragFrames = @($pet.drag)
+  $frameState = @{ index = 0; mode = 'idle'; frames = $frameList; idleFrames = $frameList; clickFrames = $clickFrames; dragFrames = $dragFrames }
   $loadFrame = {
     param($i)
     $bitmap = New-Object System.Windows.Media.Imaging.BitmapImage
@@ -93,8 +95,15 @@ foreach ($pet in @($state.pets)) {
   $timer = New-Object System.Windows.Threading.DispatcherTimer
   $timer.Interval = [TimeSpan]::FromMilliseconds(83)
   $timer.Add_Tick({
-    $frameState.index = ($frameState.index + 1) % $frameState.frames.Count
-    & $loadFrame $frameState.index
+    if ($frameState.frames.Count -gt 0) {
+      $frameState.index = ($frameState.index + 1) % $frameState.frames.Count
+      & $loadFrame $frameState.index
+    }
+    if ($frameState.mode -eq 'click' -and $frameState.index -eq 0) {
+      $frameState.mode = 'idle'
+      $frameState.frames = $frameState.idleFrames
+      & $loadFrame 0
+    }
   }.GetNewClosure())
   $timer.Start()
   $timers.Add($timer) | Out-Null
@@ -139,6 +148,11 @@ foreach ($pet in @($state.pets)) {
     $dx = [Math]::Abs($current.X - $drag.start.X)
     $dy = [Math]::Abs($current.Y - $drag.start.Y)
     if ($dx -gt 4 -or $dy -gt 4) {
+      if (-not $drag.moved -and $frameState.dragFrames.Count -gt 0) {
+        $frameState.mode = 'drag'
+        $frameState.frames = $frameState.dragFrames
+        $frameState.index = 0
+      }
       $drag.moved = $true
       $window.Left = $drag.left + ($current.X - $drag.start.X)
       $window.Top = $drag.top + ($current.Y - $drag.start.Y)
@@ -149,16 +163,26 @@ foreach ($pet in @($state.pets)) {
     $drag.active = $false
     $window.ReleaseMouseCapture()
     if (-not $drag.moved) {
-      $transform = New-Object System.Windows.Media.ScaleTransform 1.0, 1.0
-      $image.RenderTransform = $transform
-      $image.RenderTransformOrigin = New-Object System.Windows.Point 0.5, 0.5
-      $animation = New-Object System.Windows.Media.Animation.DoubleAnimation
-      $animation.From = 1.0
-      $animation.To = 0.9
-      $animation.Duration = [System.Windows.Duration]::FromMilliseconds(100)
-      $animation.AutoReverse = $true
-      $transform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleXProperty, $animation)
-      $transform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleYProperty, $animation)
+      if ($frameState.clickFrames.Count -gt 0) {
+        $frameState.mode = 'click'
+        $frameState.frames = $frameState.clickFrames
+        $frameState.index = 0
+      } else {
+        $transform = New-Object System.Windows.Media.ScaleTransform 1.0, 1.0
+        $image.RenderTransform = $transform
+        $image.RenderTransformOrigin = New-Object System.Windows.Point 0.5, 0.5
+        $animation = New-Object System.Windows.Media.Animation.DoubleAnimation
+        $animation.From = 1.0
+        $animation.To = 0.9
+        $animation.Duration = [System.Windows.Duration]::FromMilliseconds(100)
+        $animation.AutoReverse = $true
+        $transform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleXProperty, $animation)
+        $transform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleYProperty, $animation)
+      }
+    } else {
+      $frameState.mode = 'idle'
+      $frameState.frames = $frameState.idleFrames
+      $frameState.index = 0
     }
     $event.Handled = $true
   }.GetNewClosure())
@@ -183,5 +207,6 @@ foreach ($pet in @($state.pets)) {
 }
 
 [System.Windows.Threading.Dispatcher]::Run() | Out-Null
+
 
 

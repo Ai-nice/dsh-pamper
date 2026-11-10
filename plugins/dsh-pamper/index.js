@@ -288,7 +288,9 @@ async function listPacks() {
         marginY: Number(pet?.position?.marginY) || 100,
         actionCount: actions.size,
         loadedActions: [...actions],
-        idle: Array.isArray(animations.idle) ? animations.idle[0] : null
+        idle: Array.isArray(animations.idle) ? animations.idle[0] : null,
+        clicks: Array.isArray(animations.clicks) && animations.clicks[0] ? animations.clicks[0] : null,
+        drag: Array.isArray(animations.drag) && animations.drag[0] ? animations.drag[0] : null
       });
     } catch (error) {
       ctx.logger?.warn?.('[dsh-pamper] 读取角色配置失败 ' + entry + '：' + (error instanceof Error ? error.message : String(error)));
@@ -384,7 +386,9 @@ export function apply(ctx) {
     for (const item of pets) {
       try {
         const frames = await ensureFrames(ctx, item.kind, item.idle);
-        state.pets.push({ id: item.id, kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner, marginX: item.marginX, marginY: item.marginY, frames });
+        const clickFrames = item.clicks ? await ensureFrames(ctx, item.kind, item.clicks) : [];
+        const dragFrames = item.drag ? await ensureFrames(ctx, item.kind, item.drag) : [];
+        state.pets.push({ id: item.id, kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner, marginX: item.marginX, marginY: item.marginY, frames, clicks: clickFrames, drag: dragFrames });
       } catch (error) {
         ctx.logger?.warn?.('[dsh-pamper] 桌面模式准备失败 ' + item.kind + '：' + (error instanceof Error ? error.message : String(error)));
       }
