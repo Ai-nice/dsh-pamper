@@ -5,6 +5,6 @@
         storeRoot: 'D:/PC/DSH/pamper/assets/pet-store'
         catalogPath: 'D:/PC/DSH/pamper/catalog/action-store.json'
         # 资源下载根地址（你的 GitHub repo / jsDelivr / Release）。留空 = 只用本地 assets/pet-store。
-        assetBaseUrl: ''
+        assetBaseUrl: 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main'
         # 本地缓存目录（留空 = %DSH_HOME%/dsh-pet/action-cache）
         cacheRoot: ''

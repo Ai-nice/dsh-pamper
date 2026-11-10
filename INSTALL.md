@@ -20,7 +20,7 @@
 ```powershell
 node --version        # 需要 v22.x 或更高
 ffmpeg -version       # 需要能找到 ffmpeg，且带 libvpx-vp9
-echo $env:DSH_HOME    # 可选：没设置时默认 C:\Users\<你>\.dsh
+echo $env:DSH_HOME    # 可选：没设置时默认 C:\Users\Ai-nice\.dsh
 ```
 
 | 项目 | 要求 | 不满足时 |
@@ -341,7 +341,7 @@ node scripts/install.mjs
 | 构建产物 | `pamper\dist\pet\`（8 个 pack） |
 | 构建清单 | `pamper\dist\manifest.json`（packs / totals） |
 | 预览数据 | `pamper\preview\manifest.json` 与 `dist\manifest.json`（all-characters 页） |
-| pet pack 安装目录 | `%DSH_HOME%\dsh-pet\pet\`（默认 `C:\Users\<你>\.dsh\dsh-pet\pet\`） |
+| pet pack 安装目录 | `%DSH_HOME%\dsh-pet\pet\`（默认 `C:\Users\Ai-nice\.dsh\dsh-pet\pet\`） |
 | dsh-pet 用户配置 | `%DSH_HOME%\dsh-pet\main-config.jsonc` |
 | dsh-pet 日志 | `%DSH_HOME%\dsh-pet\logs.txt` |
 | dsh-pet 插件本体 | `%DSH_HOME%\profiles\<profile>\node_modules\dsh-pet\` |

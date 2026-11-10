@@ -1,5 +1,5 @@
 {
-  "basePackUrl": "",
-  "assetsBaseUrl": "",
-  "comment": "发布前填写：basePackUrl = pets-base.zip 的 GitHub Release 下载直链；assetsBaseUrl = 你上传 webm-store 的仓库 CDN 根地址（如 https://cdn.jsdelivr.net/gh/<用户名>/<assets仓库>@main）。用户运行 node scripts/install-lite.mjs 时会自动使用这两个地址。"
+  "basePackUrl": "https://github.com/Ai-nice/pamper/releases/download/v1.0.0/pets-base.zip",
+  "assetsBaseUrl": "https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main",
+  "comment": "已发布：basePackUrl 指向 GitHub Release 的 pets-base.zip；assetsBaseUrl 指向动作库 jsDelivr。"
 }

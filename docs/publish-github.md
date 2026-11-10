@@ -13,7 +13,7 @@ git init
 # .gitignore 已排除：assets/pet-store、assets/spritesheet-cache、dist、webm-store、release、.build-tmp
 git add .
 git commit -m "pamper: DSH 宠爱页 / 动作按需加载插件"
-git remote add origin https://github.com/<你>/pamper.git
+git remote add origin https://github.com/Ai-nice/pamper.git
 git push -u origin main
 ```
 
@@ -27,16 +27,16 @@ cd "D:\PC\DSH\pamper\webm-store"
 git init
 git add .
 git commit -m "pamper action assets (prebuilt alpha WebM)"
-git remote add origin https://github.com/<你>/pamper-assets.git
+git remote add origin https://github.com/Ai-nice/pamper-assets.git
 git push -u origin main
 ```
 
 上传后得到两种可用根地址（建议 jsDelivr，国内更快）：
 
-- jsDelivr：`https://cdn.jsdelivr.net/gh/<你>/pamper-assets@main`
-- GitHub raw：`https://raw.githubusercontent.com/<你>/pamper-assets/main`
+- jsDelivr：`https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main`
+- GitHub raw：`https://raw.githubusercontent.com/Ai-nice/pamper-assets/main`
 
-用浏览器打开 `https://cdn.jsdelivr.net/gh/<你>/pamper-assets@main/pets/dsh/待机呼吸休闲.webm` 验证 200 即可。
+用浏览器打开 `https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main/pets/dsh/待机呼吸休闲.webm` 验证 200 即可。
 
 ## 三、打开发布产物
 
@@ -57,11 +57,11 @@ node scripts/pack-release.mjs
 
 1. `release-config.json`：
    ```json
-   { "basePackUrl": "<pets-base.zip 的 Release 下载直链>", "assetsBaseUrl": "https://cdn.jsdelivr.net/gh/<你>/pamper-assets@main" }
+   { "basePackUrl": "<pets-base.zip 的 Release 下载直链>", "assetsBaseUrl": "https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main" }
    ```
 2. `plugin/dsh-action-store/cordis.patch.yml`：
    ```yaml
-   assetBaseUrl: 'https://cdn.jsdelivr.net/gh/<你>/pamper-assets@main'
+   assetBaseUrl: 'https://cdn.jsdelivr.net/gh/Ai-nice/pamper-assets@main'
    ```
 3. 重新打轻量包（`pack-release.mjs`）并提交主仓库。
 
@@ -69,7 +69,7 @@ node scripts/pack-release.mjs
 
 ```powershell
 # 1. 拿轻量仓库（clone 或下载 pamper-lite.zip）
-git clone https://github.com/<你>/pamper.git
+git clone https://github.com/Ai-nice/pamper.git
 cd pamper
 # 2. 下载 8 个基础形象并安装（自动读 release-config.json 的 basePackUrl）
 node scripts/install-lite.mjs

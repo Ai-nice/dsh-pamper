@@ -29,7 +29,7 @@
 用户安装：
 
 ```powershell
-git clone https://github.com/<你>/pamper.git
+git clone https://github.com/Ai-nice/pamper.git
 cd pamper
 node scripts/install-lite.mjs   # 自动从 Release 下载 pets-base.zip 并安装
 # 再在 DSH 里安装 plugin/dsh-action-store（一次）
@@ -167,7 +167,7 @@ pet\<前缀>-avatar.png        ← 可选：角色头像（xiaoxiao 系列自带
 | dsh-pet 插件 | 已安装，建议 0.4.7+ | npm 包名 `dsh-pet`，在 DSH 的插件管理/商城里安装；本项目在 0.4.7 + `desktop` profile 上验证 |
 | 本地素材源（**可选**） | 默认 `D:\PC\DSH\桌面宠物源代码` | 其中 `pet素材\`（aboutme-pets 仓库快照，约 1.4 GiB 精灵图）与 `xiaoxiao-zhuochong桌面源代码\`（小小桌宠源码与成品 WebM）。可用环境变量 `DESKTOP_PET_SOURCE_ROOT` 指向别处；**本地齐全时可完全离线构建** |
 | 网络（**可选**） | 本地素材缺失时需要 | 从 jsDelivr CDN 下载商店目录/精灵图，失败自动回退 raw.githubusercontent；xiaoxiao 素材没有网络回退，必须本地存在 |
-| DSH_HOME | 默认 `C:\Users\<你>\.dsh` | 若设置了环境变量 `DSH_HOME`，以环境变量为准 |
+| DSH_HOME | 默认 `C:\Users\Ai-nice\.dsh` | 若设置了环境变量 `DSH_HOME`，以环境变量为准 |
 | 磁盘空间 | 建议预留 ≥ 1 GB | 整个项目目录约 429 MiB：WebM 产物约 203 MiB + 精灵图缓存约 217 MiB + 临时/配置等；若本地素材源也要下载，另需约 1.4 GiB |
 
 无需执行 `npm install`：脚本只使用 Node.js 内置模块，ffmpeg 是可执行文件依赖。
