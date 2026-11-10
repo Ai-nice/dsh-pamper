@@ -93,6 +93,16 @@ window.__ModuleLoader__.load({
         if (characters.length && !characters.some((item) => item.kind === selected)) setSelected(characters[0].kind);
       }, [characters]);
 
+      const installBase = async () => {
+        setMessage('正在安装基础形象包（首次约 345MB，请稍候）…');
+        try {
+          const body = await post('/install-base', {});
+          setMessage('基础包安装完成：' + body.characters + ' 个角色');
+          await refresh();
+        } catch (error) {
+          setMessage('基础包安装失败：' + error.message);
+        }
+      };
       const selectedCharacter = characters.find((item) => item.kind === selected);
       const selectedCatalog = catalog && catalog.characters.find((item) => item.key === selectedCharacter?.kind || item.key === selectedCharacter?.group);
       const groups = ['全部', ...new Set(characters.map((item) => item.group))];

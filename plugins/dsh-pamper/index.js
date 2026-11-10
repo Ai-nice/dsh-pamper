@@ -155,6 +155,12 @@ async function downloadBasePack(ctx) {
   }
 }
 
+async function ensureBaseInstalled(ctx) {
+  if (baseInstallPromise) return baseInstallPromise;
+  baseInstallPromise = downloadBasePack(ctx).finally(() => { baseInstallPromise = null; });
+  return baseInstallPromise;
+}
+
 async function ensureMigrated(ctx) {
   await mkdir(petsDir(), { recursive: true });
   const entries = await readdir(petsDir()).catch(() => []);
@@ -171,7 +177,7 @@ async function ensureMigrated(ctx) {
   }
   await migrateMainPack(ctx);
   const after = await readdir(petsDir()).catch(() => []);
-  if (!after.some((name) => name.endsWith('-config.json'))) await downloadBasePack(ctx);
+  if (!after.some((name) => name.endsWith('-config.json'))) await ensureBaseInstalled(ctx);
 }
 
 
@@ -338,6 +344,7 @@ async function downloadAction(ctx, action) {
   throw new Error('下载失败：' + (lastError?.message || url));
 }
 
+let baseInstallPromise = null;
 export function apply(ctx) {
   let desktopChild = null;
   let catalogPromise = null;
@@ -352,6 +359,15 @@ export function apply(ctx) {
     const path = decodeURIComponent(url.pathname.slice(ROUTE.length)).replace(/^\/+/, '');
     try {
       if (req.method === 'GET' && path === 'catalog') return sendJson(res, 200, await loadCatalog());
+      if (req.method === 'GET' && path === 'install-status') {
+        const entries = await readdir(petsDir()).catch(() => []);
+        return sendJson(res, 200, { ok: true, installing: Boolean(baseInstallPromise), characters: entries.filter((name) => name.endsWith('-config.json')).length });
+      }
+      if (req.method === 'POST' && path === 'install-base') {
+        await ensureBaseInstalled(ctx);
+        const entries = await readdir(petsDir()).catch(() => []);
+        return sendJson(res, 200, { ok: true, characters: entries.filter((name) => name.endsWith('-config.json')).length });
+      }
       if (req.method === 'GET' && path === 'characters') return sendJson(res, 200, { characters: await listPacks(), dataRoot: ownRoot() });
       if (req.method === 'GET' && path === 'avatar') {
         const kind = url.searchParams.get('kind') || '';
