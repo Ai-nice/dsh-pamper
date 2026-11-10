@@ -16,6 +16,63 @@ $windows = New-Object System.Collections.ArrayList
 $timers = New-Object System.Collections.ArrayList
 $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
 
+function Set-PetDisplay($id, $display) {
+  if (-not $apiBase -or -not $id) { return }
+  try {
+    Invoke-RestMethod -Method Post -Uri ($apiBase + '/dsh-pamper-7470/pet-display') -ContentType 'application/json' -Body (@{ id = $id; display = $display } | ConvertTo-Json) | Out-Null
+  } catch {}
+}
+
+function Play-PetAction($kind, $action, $frameState) {
+  if (-not $apiBase -or -not $kind -or -not $action) { return }
+  try {
+    $result = Invoke-RestMethod -Method Get -Uri ($apiBase + '/dsh-pamper-7470/frames?kind=' + [Uri]::EscapeDataString($kind) + '&action=' + [Uri]::EscapeDataString($action))
+    $frames = @($result.frames)
+    if ($result.ok -and $frames.Count -gt 0) {
+      $frameState.mode = 'action'
+      $frameState.frames = $frames
+      $frameState.index = 0
+    }
+  } catch {}
+}
+
+function Invoke-PetMenuAction($node, $pet, $window, $frameState) {
+  $action = [string]$node.action
+  if ($action -eq 'hide') {
+    Hide-Pet $pet.id
+    $window.Close()
+    return
+  }
+  if ($action -eq 'set-display') {
+    Set-PetDisplay $pet.id ([string]$node.display)
+    if ($node.display -ne 'desktop' -and $node.display -ne 'both') { $window.Close() }
+    return
+  }
+  if ($action -eq 'home') {
+    return
+  }
+  if ($action -eq 'anim') {
+    Play-PetAction $pet.kind ([string]$node.anim) $frameState
+    return
+  }
+  return
+}
+
+function Add-PetMenuNodes($collection, $nodes, $pet, $window, $frameState) {
+  foreach ($node in @($nodes)) {
+    if ($null -eq $node) { continue }
+    $item = New-Object System.Windows.Controls.MenuItem
+    $item.Header = [string]$node.label
+    $children = @($node.children)
+    if ($children.Count -gt 0) {
+      Add-PetMenuNodes $item.Items $children $pet $window $frameState
+    } else {
+      $item.Add_Click({ Invoke-PetMenuAction $node $pet $window $frameState }.GetNewClosure())
+    }
+    $collection.Add($item) | Out-Null
+  }
+}
+
 function Hide-Pet($id) {
   if (-not $apiBase -or -not $id) { return }
   try {
@@ -99,7 +156,7 @@ foreach ($pet in @($state.pets)) {
       $frameState.index = ($frameState.index + 1) % $frameState.frames.Count
       & $loadFrame $frameState.index
     }
-    if ($frameState.mode -eq 'click' -and $frameState.index -eq 0) {
+    if ($frameState.mode -ne 'idle' -and $frameState.index -eq 0) {
       $frameState.mode = 'idle'
       $frameState.frames = $frameState.idleFrames
       & $loadFrame 0
@@ -109,18 +166,7 @@ foreach ($pet in @($state.pets)) {
   $timers.Add($timer) | Out-Null
 
   $menu = New-Object System.Windows.Controls.ContextMenu
-  $exitItem = New-Object System.Windows.Controls.MenuItem
-  $exitItem.Header = '退出回家'
-  $exitItem.Add_Click({ Hide-Pet $pet.id; $window.Close() }.GetNewClosure())
-  $hideItem = New-Object System.Windows.Controls.MenuItem
-  $hideItem.Header = '隐藏'
-  $hideItem.Add_Click({ Hide-Pet $pet.id; $window.Close() }.GetNewClosure())
-  $reloadItem = New-Object System.Windows.Controls.MenuItem
-  $reloadItem.Header = '重载配置'
-  $reloadItem.Add_Click({ Reload-Desktop; $window.Close() }.GetNewClosure())
-  $menu.Items.Add($exitItem) | Out-Null
-  $menu.Items.Add($hideItem) | Out-Null
-  $menu.Items.Add($reloadItem) | Out-Null
+  Add-PetMenuNodes $menu.Items @($pet.menu) $pet $window $frameState
   $window.ContextMenu = $menu
   $canvas.ContextMenu = $menu
   $image.ContextMenu = $menu
@@ -167,17 +213,6 @@ foreach ($pet in @($state.pets)) {
         $frameState.mode = 'click'
         $frameState.frames = $frameState.clickFrames
         $frameState.index = 0
-      } else {
-        $transform = New-Object System.Windows.Media.ScaleTransform 1.0, 1.0
-        $image.RenderTransform = $transform
-        $image.RenderTransformOrigin = New-Object System.Windows.Point 0.5, 0.5
-        $animation = New-Object System.Windows.Media.Animation.DoubleAnimation
-        $animation.From = 1.0
-        $animation.To = 0.9
-        $animation.Duration = [System.Windows.Duration]::FromMilliseconds(100)
-        $animation.AutoReverse = $true
-        $transform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleXProperty, $animation)
-        $transform.BeginAnimation([System.Windows.Media.ScaleTransform]::ScaleYProperty, $animation)
       }
     } else {
       $frameState.mode = 'idle'
@@ -199,14 +234,19 @@ foreach ($pet in @($state.pets)) {
   $interop = New-Object System.Windows.Interop.WindowInteropHelper($window)
   $handle = $interop.Handle
   try { [PamperTop]::SetForegroundWindow($handle) | Out-Null } catch {}
+  $topCtx = @{ handle = $handle; window = $window }
   $topTimer = New-Object System.Windows.Threading.DispatcherTimer
   $topTimer.Interval = [TimeSpan]::FromMilliseconds(200)
-  $topTimer.Add_Tick({ $window.Topmost = $true; [PamperTop]::SetWindowPos($handle, [IntPtr](-1), 0, 0, 0, 0, 0x0013) | Out-Null }.GetNewClosure())
+  $topTimer.Add_Tick({ [PamperTop]::SetWindowPos([IntPtr]$topCtx.handle, [IntPtr](-1), 0, 0, 0, 0, 0x0013) | Out-Null; $topCtx.window.Topmost = $true }.GetNewClosure())
   $topTimer.Start()
   $timers.Add($topTimer) | Out-Null
 }
 
 [System.Windows.Threading.Dispatcher]::Run() | Out-Null
+
+
+
+
 
 
 

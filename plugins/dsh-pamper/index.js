@@ -21,6 +21,49 @@ const HELPER_DIR = fileURLToPath(new URL('./helper/', import.meta.url));
 const ELECTRON_VERSION = '44.7.0';
 const ELECTRON_MIRROR = 'https://npmmirror.com/mirrors/electron/';
 const BASE_PACK_URL = 'https://github.com/Ai-nice/dsh-pamper/releases/download/v1.0.0/pets-base-v2.zip';
+function buildPetMenu(animations) {
+  const groups = [];
+  const addGroup = (label, names) => {
+    const clean = Array.isArray(names) ? [...new Set(names.filter((name) => typeof name === 'string' && name))] : [];
+    if (clean.length) groups.push({ label, children: clean.map((name) => ({ label: name, action: 'anim', anim: name })) });
+  };
+  addGroup('待机', animations.idle);
+  addGroup('转向', animations.turn);
+  addGroup('拖拽', animations.drag);
+  addGroup('点击回应', animations.clicks);
+  addGroup('移动', (animations.moves && Array.isArray(animations.moves.actions)) ? animations.moves.actions.map((item) => item && item.name) : []);
+  for (const category of Array.isArray(animations.categories) ? animations.categories : []) {
+    addGroup(category && category.id, category && category.actions);
+  }
+  const events = animations.events && typeof animations.events === 'object' ? animations.events : {};
+  for (const key of Object.keys(events)) {
+    const names = [];
+    for (const slot of Array.isArray(events[key]) ? events[key] : []) {
+      if (typeof slot === 'string') names.push(slot);
+      else if (Array.isArray(slot)) names.push(...slot);
+    }
+    addGroup(key, names);
+  }
+  const menu = [
+    { label: '打开软件', action: 'open-site' },
+    { label: '查看余额', action: 'show-balance' },
+    { label: '待办事项', action: 'todo' },
+    { label: '碎碎念', action: 'whisper' },
+    { label: '对话', action: 'chat' }
+  ];
+  if (Array.isArray(animations.sleep) && animations.sleep.length > 0) menu.push({ label: '睡觉', action: 'sleep' });
+  if (groups.length) menu.push({ label: '动作', children: groups });
+  menu.push({ label: '显示位置', children: [
+    { label: '仅网页', action: 'set-display', display: 'web' },
+    { label: '仅桌面', action: 'set-display', display: 'desktop' },
+    { label: '两者', action: 'set-display', display: 'both' },
+    { label: '都不', action: 'set-display', display: 'none' }
+  ] });
+  menu.push({ label: '回到初始位置', action: 'home' });
+  menu.push({ label: '隐藏', action: 'hide' });
+  return menu;
+}
+
 const GROUP_OF = (kind) => {
   if (kind === 'main') return 'deepseek';
   if (kind.startsWith('aboutme-dragon')) return 'GPT';
@@ -290,7 +333,8 @@ async function listPacks() {
         loadedActions: [...actions],
         idle: Array.isArray(animations.idle) ? animations.idle[0] : null,
         clicks: Array.isArray(animations.clicks) && animations.clicks[0] ? animations.clicks[0] : null,
-        drag: Array.isArray(animations.drag) && animations.drag[0] ? animations.drag[0] : null
+        drag: Array.isArray(animations.drag) && animations.drag[0] ? animations.drag[0] : null,
+        menu: buildPetMenu(animations)
       });
     } catch (error) {
       ctx.logger?.warn?.('[dsh-pamper] 读取角色配置失败 ' + entry + '：' + (error instanceof Error ? error.message : String(error)));
@@ -388,7 +432,7 @@ export function apply(ctx) {
         const frames = await ensureFrames(ctx, item.kind, item.idle);
         const clickFrames = item.clicks ? await ensureFrames(ctx, item.kind, item.clicks) : [];
         const dragFrames = item.drag ? await ensureFrames(ctx, item.kind, item.drag) : [];
-        state.pets.push({ id: item.id, kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner, marginX: item.marginX, marginY: item.marginY, frames, clicks: clickFrames, drag: dragFrames });
+        state.pets.push({ id: item.id, kind: item.kind, name: item.name, idle: item.idle, size: item.size, corner: item.corner, marginX: item.marginX, marginY: item.marginY, frames, clicks: clickFrames, drag: dragFrames, menu: item.menu });
       } catch (error) {
         ctx.logger?.warn?.('[dsh-pamper] 桌面模式准备失败 ' + item.kind + '：' + (error instanceof Error ? error.message : String(error)));
       }
@@ -426,6 +470,17 @@ export function apply(ctx) {
         await ensureBaseInstalled(ctx);
         const entries = await readdir(petsDir()).catch(() => []);
         return sendJson(res, 200, { ok: true, characters: entries.filter((name) => name.endsWith('-config.json')).length });
+      }
+      if (req.method === 'GET' && path === 'frames') {
+        const kind = url.searchParams.get('kind') || '';
+        const action = url.searchParams.get('action') || '';
+        if (!/^[a-z0-9_-]+$/i.test(kind) || !action) return sendJson(res, 400, { ok: false, error: 'bad request' });
+        try {
+          const frames = await ensureFrames(ctx, kind, action);
+          return sendJson(res, 200, { ok: true, frames });
+        } catch (error) {
+          return sendJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
+        }
       }
       if (req.method === 'GET' && path === 'preview') {
         const pack = url.searchParams.get('pack') || '';
