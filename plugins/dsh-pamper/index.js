@@ -60,7 +60,7 @@ const writeJson = async (path, value) => writeFile(path, JSON.stringify(value, n
 
 async function ensureFrames(ctx, kind, action) {
   const safe = action.replace(/[\\/:*?"<>|]/g, '_');
-  const dir = join(ownRoot(), 'desktop-frames', kind, safe);
+  const dir = join(ownRoot(), 'desktop-frames-v2', kind, safe);
   const existing = (await readdir(dir).catch(() => [])).filter((name) => name.endsWith('.png')).sort();
   if (existing.length > 0) return existing.map((name) => join(dir, name));
   const webm = join(petsDir(), kind + '-animation', action + '.webm');
@@ -69,7 +69,7 @@ async function ensureFrames(ctx, kind, action) {
   let ffmpeg = process.env.PAMPER_FFMPEG || '';
   if (!ffmpeg) { try { ffmpeg = createRequire(import.meta.url)('@ffmpeg-installer/ffmpeg').path; } catch {} }
   if (!ffmpeg) ffmpeg = 'ffmpeg';
-  const result = spawnSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', webm, '-vf', 'fps=12,scale=360:-1:flags=lanczos', '-pix_fmt', 'rgba', join(dir, 'frame-%04d.png')], { windowsHide: true });
+  const result = spawnSync(ffmpeg, ['-y', '-loglevel', 'error', '-c:v', 'libvpx-vp9', '-i', webm, '-vf', 'fps=12,scale=360:-1:flags=lanczos', '-pix_fmt', 'rgba', join(dir, 'frame-%04d.png')], { windowsHide: true });
   if (result.status !== 0) throw new Error('ffmpeg 转换失败，请安装 ffmpeg 或设置 PAMPER_FFMPEG');
   const after = (await readdir(dir)).filter((name) => name.endsWith('.png')).sort();
   return after.map((name) => join(dir, name));
