@@ -13,14 +13,14 @@
     {
       "name": "dsh-pamper",
       "title": {
-        "en": "Pamper action store",
-        "zh": "pamper 动作库"
+        "en": "Pamper desktop pet",
+        "zh": "宠爱桌宠"
       },
       "description": {
-        "en": "Standalone Pamper desktop pet: characters, config, discovery and in-page pet overlay; no dsh-pet required.",
-        "zh": "完全独立的 pamper 桌宠：角色、桌宠配置、发现页与页面内宠物浮层；不依赖 dsh-pet。"
+        "en": "Standalone Pamper desktop pet built on a dsh-pet fork: 9 character packs, characters/config/discovery pages, native desktop click, drag and context menu; no installed dsh-pet required.",
+        "zh": "基于 dsh-pet fork 的独立宠爱桌宠：9 个角色包、角色/桌宠配置/发现三个页面，以及桌面点击、拖拽和右键菜单；不依赖已安装的 dsh-pet。"
       },
-      "icon": "https://raw.githubusercontent.com/Ai-nice/dsh-pamper/main/plugins/dsh-pamper/icon.svg",
+      "icon": "https://raw.githubusercontent.com/Ai-nice/dsh-pamper/main/plugins/dsh-pamper/assets/logo.png",
       "author": "Ai-nice",
       "homepage": "https://github.com/Ai-nice/dsh-pamper",
       "repository": {
@@ -31,11 +31,22 @@
         "keywords": [
           "desktop pet",
           "dsh-pet",
-          "actions"
+          "pamper",
+          "characters"
         ],
         "labels": []
       },
       "versions": [
+        {
+          "version": "6.1.5",
+          "publishTimestamp": 1794566092,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.0"
+          }
+        },
         {
           "version": "0.5.2",
           "publishTimestamp": 1794312865,
